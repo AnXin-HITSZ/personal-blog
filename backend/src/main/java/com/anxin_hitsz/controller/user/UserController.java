@@ -1,7 +1,7 @@
-package com.anxin_hitsz.controller;
+package com.anxin_hitsz.controller.user;
 
 import com.anxin_hitsz.entity.User;
-import com.anxin_hitsz.service.IUserService;
+import com.anxin_hitsz.service.user.IUserService;
 import com.anxin_hitsz.utils.Result;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;

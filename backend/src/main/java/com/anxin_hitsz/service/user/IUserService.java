@@ -1,4 +1,4 @@
-package com.anxin_hitsz.service;
+package com.anxin_hitsz.service.user;
 
 import com.anxin_hitsz.entity.User;
 import com.baomidou.mybatisplus.extension.service.IService;

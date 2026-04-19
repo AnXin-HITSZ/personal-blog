@@ -1,4 +1,4 @@
-package com.anxin_hitsz.controller;
+package com.anxin_hitsz.controller.article;
 
 /**
  * ClassName: ArticleController

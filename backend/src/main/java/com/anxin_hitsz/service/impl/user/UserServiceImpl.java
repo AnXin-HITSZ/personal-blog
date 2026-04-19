@@ -1,8 +1,8 @@
-package com.anxin_hitsz.service.impl;
+package com.anxin_hitsz.service.impl.user;
 
 import com.anxin_hitsz.entity.User;
 import com.anxin_hitsz.mapper.UserMapper;
-import com.anxin_hitsz.service.IUserService;
+import com.anxin_hitsz.service.user.IUserService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import org.springframework.stereotype.Service;
 
