@@ -7,6 +7,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -25,8 +26,12 @@ import java.io.IOException;
  * @Create 2026/4/19 16:34
  * @Version 1.0
  */
+@Slf4j
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    @Resource
+    private JwtUtils jwtUtils;
 
     @Resource
     private UserDetailsServiceImpl userDetailsService; // 注入用户详情服务
@@ -42,6 +47,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // 步骤 1：从请求头中获取 JWT
         // ==========================================
         String authHeader = request.getHeader("Authorization");
+        log.info("Authorization: {}", authHeader);
 
         // 检查请求头是否存在，且是否以 "Bearer " 开头
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -56,7 +62,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // ==========================================
         // 步骤 2：验证 JWT 的合法性
         // ==========================================
-        if (!JwtUtils.validateToken(token)) {
+        if (!jwtUtils.validateToken(token)) {
             // JWT 验证失败（签名错误或已过期），直接放行
             filterChain.doFilter(request, response);
             return;
@@ -65,7 +71,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // ==========================================
         // 步骤 3：从 JWT 中解析用户名
         // ==========================================
-        String username = JwtUtils.getUsername(token);
+        String username = jwtUtils.getUsername(token);
 
         // ==========================================
         // 步骤 4：检查 Security 上下文是否已有认证信息

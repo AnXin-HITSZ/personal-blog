@@ -1,4 +1,4 @@
-package com.anxin_hitsz.mapper;
+package com.anxin_hitsz.mapper.user;
 
 import com.anxin_hitsz.entity.User;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;

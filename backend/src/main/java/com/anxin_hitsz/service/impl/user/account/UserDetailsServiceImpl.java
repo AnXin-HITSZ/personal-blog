@@ -1,8 +1,7 @@
 package com.anxin_hitsz.service.impl.user.account;
 
-import cn.hutool.core.util.StrUtil;
 import com.anxin_hitsz.entity.User;
-import com.anxin_hitsz.mapper.UserMapper;
+import com.anxin_hitsz.mapper.user.UserMapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import jakarta.annotation.Resource;
 import org.springframework.security.core.userdetails.UserDetails;

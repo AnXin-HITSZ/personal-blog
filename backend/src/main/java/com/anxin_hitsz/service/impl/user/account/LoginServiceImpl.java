@@ -26,6 +26,9 @@ import org.springframework.stereotype.Service;
 public class LoginServiceImpl implements ILoginService {
 
     @Resource
+    private JwtUtils jwtUtils;
+
+    @Resource
     private AuthenticationManager authenticationManager;
 
     @Override
@@ -34,7 +37,7 @@ public class LoginServiceImpl implements ILoginService {
         Authentication authentication = authenticationManager.authenticate(authenticationToken);
         UserDetailsImpl loginUser = (UserDetailsImpl) authentication.getPrincipal();
         User user = loginUser.getUser();
-        String jwt = JwtUtils.generateToken(user.getUserId(), user.getUsername());
+        String jwt = jwtUtils.generateToken(user.getUserId(), user.getUsername());
 
         return Result.ok(jwt);
     }
