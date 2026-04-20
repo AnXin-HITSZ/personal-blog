@@ -29,3 +29,20 @@ export interface Article {
   createTime?: string
   updateTime?: string
 }
+
+export interface ChatMessage {
+  role: string
+  content: string
+}
+
+export interface ChatRequest {
+  messages: ChatMessage[]
+  temperature?: number
+  isStream?: boolean
+}
+
+export interface ChatResponse {
+  content: string
+  model?: string
+  usage?: Record<string, any>
+}
