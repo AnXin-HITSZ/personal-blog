@@ -1,7 +1,6 @@
 package com.anxin_hitsz.controller.user.account;
 
-import com.anxin_hitsz.dto.RegisterDTO;
-import com.anxin_hitsz.entity.User;
+import com.anxin_hitsz.dto.user.RegisterDTO;
 import com.anxin_hitsz.service.user.account.IRegisterService;
 import com.anxin_hitsz.utils.Result;
 import jakarta.annotation.Resource;

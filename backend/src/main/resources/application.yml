@@ -6,9 +6,16 @@ spring:
     url: jdbc:mysql://localhost:3306/personal_blog?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+
 logging:
   level:
     org.springframework.security: DEBUG
+
 jwt:
   secret: ${JWT_SECRET_KEY}
   expiration: ${JWT_EXPIRATION}
+
+fastapi:
+  service:
+    url: http://127.0.0.1:8000
+    timeout: 60000

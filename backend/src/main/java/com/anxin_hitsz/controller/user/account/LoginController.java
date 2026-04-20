@@ -1,6 +1,6 @@
 package com.anxin_hitsz.controller.user.account;
 
-import com.anxin_hitsz.dto.LoginDTO;
+import com.anxin_hitsz.dto.user.LoginDTO;
 import com.anxin_hitsz.service.user.account.ILoginService;
 import com.anxin_hitsz.utils.Result;
 import jakarta.annotation.Resource;

@@ -77,6 +77,7 @@ public class SecurityConfig {
                         // 允许注册接口匿名访问
                         .requestMatchers("/user/account/register", "/user/account/login").permitAll()
                         .requestMatchers("/api/article/**").permitAll()
+                        .requestMatchers("/api/agent/**").permitAll()
                         // 其他请求需要认证
                         .anyRequest().authenticated()
                 )

@@ -1,8 +1,7 @@
 package com.anxin_hitsz.service.user.account;
 
-import com.anxin_hitsz.dto.RegisterDTO;
+import com.anxin_hitsz.dto.user.RegisterDTO;
 import com.anxin_hitsz.utils.Result;
-import com.baomidou.mybatisplus.extension.service.IService;
 
 /**
  * ClassName: IRegisterService

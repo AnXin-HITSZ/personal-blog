@@ -1,4 +1,4 @@
-package com.anxin_hitsz.dto;
+package com.anxin_hitsz.dto.user;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

@@ -1,7 +1,6 @@
 package com.anxin_hitsz.service.impl.user.account;
 
-import cn.hutool.jwt.JWTUtil;
-import com.anxin_hitsz.dto.LoginDTO;
+import com.anxin_hitsz.dto.user.LoginDTO;
 import com.anxin_hitsz.entity.User;
 import com.anxin_hitsz.service.user.account.ILoginService;
 import com.anxin_hitsz.utils.JwtUtils;
@@ -10,7 +9,6 @@ import jakarta.annotation.Resource;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 /**
