@@ -16,18 +16,18 @@ import java.util.List;
 @Data
 public class ChatRequest {
     /**
+     * 用户历史消息记录 Redis id
+     */
+    private String sessionId;
+
+    /**
      * 消息列表
      */
     private List<ChatMessage> messages;
 
     /**
-     * 温度系数
-     */
-    private Double temperature = 0.7;
-
-    /**
      * 是否开启流式响应
      */
-    private Boolean isStream = true;
+    private Boolean stream = true;
 
 }

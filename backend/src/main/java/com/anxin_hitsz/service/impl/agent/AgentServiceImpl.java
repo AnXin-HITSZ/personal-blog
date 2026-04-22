@@ -1,17 +1,12 @@
 package com.anxin_hitsz.service.impl.agent;
 
 import com.anxin_hitsz.dto.agent.ChatRequest;
-import com.anxin_hitsz.dto.agent.ChatResponse;
 import com.anxin_hitsz.service.agent.IAgentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
-import java.util.List;
-import java.util.Map;
 
 /**
  * ClassName: AgentServiceImpl

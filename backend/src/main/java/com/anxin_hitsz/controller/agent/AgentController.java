@@ -1,7 +1,6 @@
 package com.anxin_hitsz.controller.agent;
 
 import com.anxin_hitsz.dto.agent.ChatRequest;
-import com.anxin_hitsz.dto.agent.ChatResponse;
 import com.anxin_hitsz.service.agent.IAgentService;
 import jakarta.annotation.Resource;
 import org.springframework.http.MediaType;
@@ -10,8 +9,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
-import java.awt.*;
 
 /**
  * ClassName: AgentController

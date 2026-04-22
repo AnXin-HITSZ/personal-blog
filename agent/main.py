@@ -1,60 +1,87 @@
 import json
-
+import os
+from typing import List, Optional
+from pydantic import BaseModel
+from pydantic.alias_generators import to_camel
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import StreamingResponse
 
+from app.agents.simple_agent import SimpleAgent
 from app.core.llm import AgentsLLM
+from app.tools.registry import ToolRegistry
+from app.core.redis import RedisChatService
+from app.core.message import Message
 
-app = FastAPI()
+from app.tools.default_tools import CurrentTimeTool
+
+LLM_MODEL_ID = os.getenv('LLM_MODEL_ID')
+LLM_API_KEY = os.getenv('LLM_API_KEY')
+LLM_BASE_URL = os.getenv('LLM_BASE_URL')
+
+llm = AgentsLLM(
+    LLM_MODEL_ID,
+    LLM_API_KEY,
+    LLM_BASE_URL
+)
+
+tool_registry = ToolRegistry()
+tool_registry.register_tool(CurrentTimeTool())
+
+app = FastAPI(title="AI Agent 流式对话服务", version="1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-try:
-    llm_client = AgentsLLM()
-except Exception as e:
-    print(f"LLM 初始化失败: {e}")
-    llm_client = None
-
 class ChatMessage(BaseModel):
-    role: str = Field(..., examples=["user"])
-    content: str = Field(..., examples=["你好！"])
+    role: str
+    content: str
 
 class ChatRequest(BaseModel):
+    session_id: str
     messages: List[ChatMessage]
-    temperature: Optional[float] = 0.7
-    is_stream: Optional[bool] = True
+    stream: Optional[bool] = True
 
-class ChatResponse(BaseModel):
-    content: str
-    model: str
-    usage: Optional[Dict[str, Any]] = None
+    model_config = {
+        "alias_generator": to_camel,
+        "populate_by_name": True
+    }
 
 @app.post("/api/agent/chat/stream")
 async def chat_stream(request: ChatRequest):
-    """
-    供 SpringBoot 调用的流式聊天接口
-    """
+    if not request.session_id or not request.messages:
+        raise HTTPException(400, "参数错误")
 
-    if not llm_client:
-        raise HTTPException(status_code=500, detail="AI 服务未初始化")
+    user_input = request.messages[-1].content
+    session_id = request.session_id
 
-    messages = [msg.model_dump() for msg in request.messages]
+    history = RedisChatService.get_chat_history(session_id)
+
+    agent = SimpleAgent(
+        LLM_MODEL_ID,
+        llm,
+        tool_registry
+    )
+
+    for msg in history:
+        agent.add_message(Message(**msg))
 
     def generate():
-        for chunk in llm_client.stream_invoke(messages, temperature=request.temperature):
-            yield f"data: {json.dumps({'content': chunk})}\n\n"
+        full_resp = ""
+        for chunk in agent.run(user_input, max_tool_iterations=3, stream=request.stream):
+            full_resp += chunk
+            yield f"data: {json.dumps({'content': chunk}, ensure_ascii=False)}\n\n"
+
+        new_history = history + [
+            {"role": "user", "content": user_input},
+            {"role": "assistant", "content": full_resp}
+        ]
+        RedisChatService.save_chat_history(session_id, new_history)
         yield "data: [DONE]\n\n"
 
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream"
-    )
+    return StreamingResponse(generate(), media_type="text/event-stream")
