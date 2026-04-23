@@ -50,38 +50,152 @@
 
       <!-- Chat Container -->
       <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200">
+        <!-- Model Selector -->
+        <div class="border-b border-gray-200 px-6 py-4 bg-gradient-to-r from-gray-50 to-white">
+          <div class="flex items-center space-x-4">
+            <span class="text-sm font-semibold text-gray-500 tracking-wide uppercase">Agent:</span>
+            <div class="flex bg-gray-100/80 rounded-xl p-1 gap-1">
+              <!-- SimpleAgent -->
+              <button
+                @click="agentType = 'simple'"
+                :class="[
+                  'flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+                  agentType === 'simple'
+                    ? 'bg-white text-blue-700 shadow-sm border border-blue-200'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 border border-transparent'
+                ]"
+              >
+                <svg :class="agentType === 'simple' ? 'text-blue-500' : 'text-gray-400'" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+                <div class="text-left">
+                  <div :class="agentType === 'simple' ? 'text-blue-700' : 'text-gray-700'" class="font-semibold leading-tight">SimpleAgent</div>
+                  <div :class="agentType === 'simple' ? 'text-blue-400' : 'text-gray-400'" class="text-[11px] leading-tight mt-0.5">日常对话</div>
+                </div>
+                <div v-if="agentType === 'simple'" class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
+              </button>
+
+              <!-- ReActAgent -->
+              <button
+                @click="agentType = 'react'"
+                :class="[
+                  'flex items-center gap-2.5 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+                  agentType === 'react'
+                    ? 'bg-white text-purple-700 shadow-sm border border-purple-200'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 border border-transparent'
+                ]"
+              >
+                <svg :class="agentType === 'react' ? 'text-purple-500' : 'text-gray-400'" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                <div class="text-left">
+                  <div :class="agentType === 'react' ? 'text-purple-700' : 'text-gray-700'" class="font-semibold leading-tight">ReActAgent</div>
+                  <div :class="agentType === 'react' ? 'text-purple-400' : 'text-gray-400'" class="text-[11px] leading-tight mt-0.5">思维链模式</div>
+                </div>
+                <div v-if="agentType === 'react'" class="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></div>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- Messages Area -->
         <div ref="messagesContainer" class="h-[500px] overflow-y-auto p-6 space-y-6">
-          <div v-for="(message, index) in messages" :key="index" class="flex" :class="message.role === 'user' ? 'justify-end' : 'justify-start'">
-            <div
-              class="max-w-[80%] rounded-2xl px-5 py-3"
-              :class="message.role === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-gray-100 text-gray-800 rounded-bl-none'"
-            >
-              <div class="font-medium mb-1">
-                {{ message.role === 'user' ? 'You' : 'AI' }}
+          <div v-for="(message, index) in messages" :key="index">
+            <!-- User message -->
+            <div v-if="message.role === 'user'" class="flex justify-end mb-4">
+              <div class="max-w-[80%] rounded-2xl px-5 py-3 bg-blue-600 text-white rounded-br-none">
+                <div class="font-medium mb-1">You</div>
+                <div class="whitespace-pre-wrap break-words">{{ message.content }}</div>
+                <div class="text-xs opacity-70 mt-2 text-right">{{ message.timestamp }}</div>
               </div>
-              <div class="whitespace-pre-wrap break-words">
-                {{ message.content }}
-                <span v-if="message.streaming && message.role === 'assistant'" class="inline-block w-2 h-4 ml-1 bg-gray-400 animate-pulse"></span>
+            </div>
+
+            <!-- SimpleAgent assistant message -->
+            <div v-else-if="message.role === 'assistant' && !message.reactData" class="flex justify-start mb-4">
+              <div class="max-w-[80%] rounded-2xl px-5 py-3 bg-gray-100 text-gray-800 rounded-bl-none">
+                <div class="font-medium mb-1">AI Assistant</div>
+                <div class="markdown-body">
+                  <div v-html="renderMarkdown(message.content)"></div>
+                  <span v-if="message.streaming" class="inline-block w-2 h-4 ml-1 bg-gray-400 animate-pulse"></span>
+                </div>
+                <div class="text-xs opacity-70 mt-2 text-right">{{ message.timestamp }}</div>
               </div>
-              <div class="text-xs opacity-70 mt-2 text-right">
-                {{ message.timestamp }}
+            </div>
+
+            <!-- ReActAgent message -->
+            <div v-else-if="message.role === 'assistant' && message.reactData" class="flex justify-start mb-4">
+              <div class="max-w-[85%] rounded-2xl px-5 py-3 bg-gray-100 text-gray-800 rounded-bl-none">
+                <div class="font-medium mb-1 text-purple-700">AI Assistant (ReAct)</div>
+
+                <!-- Collapsible ReAct Process -->
+                <div v-if="message.reactData.steps.length > 0" class="mb-5">
+                  <button
+                    @click="toggleReactCollapse(index)"
+                    class="flex items-center space-x-2 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors mb-2"
+                  >
+                    <svg
+                      class="w-3 h-3 transition-transform duration-200"
+                      :class="{ 'rotate-90': !message.reactCollapsed }"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    <span>ReAct Process ({{ message.reactData.steps.length }} steps)</span>
+                    <span v-if="message.streaming" class="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
+                  </button>
+
+                  <div v-show="!message.reactCollapsed" class="space-y-2">
+                    <div
+                      v-for="(step, si) in message.reactData.steps"
+                      :key="si"
+                      class="border border-gray-200 rounded-lg overflow-hidden"
+                    >
+                      <!-- Step header -->
+                      <div class="bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-500 border-b border-gray-200">
+                        Step {{ step.stepNumber }}
+                      </div>
+
+                      <!-- Thought -->
+                      <div v-if="step.thought" class="px-3 py-2 bg-amber-50 border-b border-gray-200">
+                        <div class="flex">
+                          <span class="text-xs font-semibold text-amber-700 w-24 shrink-0">Thought:</span>
+                          <span class="text-sm text-gray-700 whitespace-pre-wrap">{{ step.thought }}</span>
+                        </div>
+                      </div>
+
+                      <!-- Action -->
+                      <div v-if="step.action" class="px-3 py-2 bg-blue-50 border-b border-gray-200">
+                        <div class="flex">
+                          <span class="text-xs font-semibold text-blue-700 w-24 shrink-0">Action:</span>
+                          <span class="text-sm text-gray-700 whitespace-pre-wrap font-mono">
+                            {{ step.action.tool }}({{ step.action.input }})
+                          </span>
+                        </div>
+                      </div>
+
+                      <!-- Observation -->
+                      <div v-if="step.observation" class="px-3 py-2 bg-green-50 border-b border-gray-200">
+                        <div class="flex">
+                          <span class="text-xs font-semibold text-green-700 w-24 shrink-0">Observation:</span>
+                          <span class="text-sm text-gray-700 whitespace-pre-wrap">{{ step.observation }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Final Answer -->
+                <div class="markdown-body">
+                  <div v-html="renderMarkdown(message.content)"></div>
+                  <span v-if="message.streaming" class="inline-block w-2 h-4 ml-1 bg-gray-400 animate-pulse"></span>
+                </div>
+                <div class="text-xs opacity-70 mt-2 text-right">{{ message.timestamp }}</div>
               </div>
             </div>
           </div>
 
-          <!-- Loading indicator when waiting for response -->
-          <div v-if="loading" class="flex justify-start">
-            <div class="max-w-[80%] rounded-2xl rounded-bl-none bg-gray-100 text-gray-800 px-5 py-3">
-              <div class="font-medium mb-1">AI</div>
-              <div class="flex items-center space-x-2">
-                <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
-              </div>
-            </div>
-          </div>
-
+          <!-- Empty state -->
           <div v-if="messages.length === 0" class="text-center py-12 text-gray-500">
             <div class="text-5xl mb-4">🤖</div>
             <p class="text-xl">Start a conversation with the AI assistant</p>
@@ -113,13 +227,8 @@
               Send
             </el-button>
           </div>
-          <div class="mt-3 flex justify-between items-center text-sm text-gray-500">
-            <div>
-              <el-checkbox v-model="enableStream" label="Stream response" />
-            </div>
-            <div>
-              <el-button type="info" plain @click="handleClearChat" size="small">Clear Chat</el-button>
-            </div>
+          <div class="mt-3 flex justify-end items-center text-sm text-gray-500">
+            <el-button type="info" plain @click="handleClearChat" size="small">Clear Chat</el-button>
           </div>
         </div>
       </div>
@@ -144,11 +253,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, nextTick, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { streamChat, chat } from '@/api/agent'
-import type { ChatMessage, ChatRequest } from '@/types/api'
+import { streamSimpleAgentChat, streamReActAgentChat } from '@/api/agent'
+import type { ChatMessage, ChatRequest, AgentType, ReActData } from '@/types/api'
+import MarkdownIt from 'markdown-it'
+
+const md = new MarkdownIt({
+  html: false,
+  linkify: true,
+  breaks: true,
+})
+
+const renderMarkdown = (text: string): string => {
+  if (!text) return ''
+  return md.render(text)
+}
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
@@ -157,12 +278,14 @@ const authStore = useAuthStore()
 interface Message extends ChatMessage {
   timestamp: string
   streaming?: boolean
+  reactData?: ReActData
+  reactCollapsed?: boolean
 }
 
 const messages = ref<Message[]>([])
 const inputMessage = ref('')
 const loading = ref(false)
-const enableStream = ref(true)
+const agentType = ref<AgentType>('simple')
 const messagesContainer = ref<HTMLElement>()
 const sessionId = ref<string>('')
 
@@ -182,39 +305,41 @@ const scrollToBottom = () => {
 
 const addMessage = (role: string, content: string, streaming = false) => {
   const timestamp = formatTime(new Date())
-  const message = { role, content, timestamp, streaming }
+  const message: Message = { role, content, timestamp, streaming }
   messages.value.push(message)
-  console.log(`Added ${role} message:`, { content, streaming })
   scrollToBottom()
 }
 
-const updateLastMessage = (content: string) => {
-  const last = messages.value[messages.value.length - 1]
-  if (last && last.role === 'assistant') {
-    last.content = content
-    scrollToBottom()
+const toggleReactCollapse = (index: number) => {
+  const msg = messages.value[index]
+  if (msg) {
+    msg.reactCollapsed = !msg.reactCollapsed
   }
 }
 
 const handleSendMessage = async () => {
-  // Abort previous stream if any
   if (abortStream) {
     abortStream()
     abortStream = null
   }
+
   const text = inputMessage.value.trim()
-  console.log('User input text:', text)
   if (!text || loading.value) return
+
+  loading.value = true
 
   // Add user message
   addMessage('user', text)
   inputMessage.value = ''
 
   // Add placeholder assistant message
-  if (enableStream.value) {
-    addMessage('assistant', '', true)
-  } else {
-    loading.value = true
+  addMessage('assistant', '', true)
+  const msgIndex = messages.value.length - 1
+
+  // Initialize reactData for ReAct agent
+  if (agentType.value === 'react') {
+    messages.value[msgIndex].reactData = { steps: [], finalAnswer: '' }
+    messages.value[msgIndex].reactCollapsed = false
   }
 
   // 过滤掉内容为空的消息（避免发送占位符消息给后端）
@@ -222,57 +347,114 @@ const handleSendMessage = async () => {
     .filter(m => m.content.trim() !== '')
     .map(m => ({ role: m.role, content: m.content }))
 
-  console.log('Sending messages to backend:', filteredMessages)
-
   const request: ChatRequest = {
     sessionId: sessionId.value,
     messages: filteredMessages,
-    stream: enableStream.value,
   }
 
-  if (enableStream.value) {
-    // Stream response
-    abortStream = streamChat(
+  if (agentType.value === 'simple') {
+    abortStream = streamSimpleAgentChat(
       request,
       (chunk) => {
-        const last = messages.value[messages.value.length - 1]
-        if (last && last.role === 'assistant') {
-          last.content += chunk
-          last.streaming = true
+        const lastMsg = messages.value[msgIndex]
+        if (lastMsg) {
+          lastMsg.content += chunk
+          lastMsg.streaming = true
           scrollToBottom()
         }
       },
       (error) => {
-        console.error('Stream error:', error)
+        console.error('SimpleAgent stream error:', error)
         ElMessage.error('Failed to get response')
-        if (messages.value.length > 0 && messages.value[messages.value.length - 1].role === 'assistant') {
-          messages.value[messages.value.length - 1].streaming = false
-          if (messages.value[messages.value.length - 1].content === '') {
-            messages.value[messages.value.length - 1].content = 'Sorry, an error occurred.'
+        const lastMsg = messages.value[msgIndex]
+        if (lastMsg) {
+          lastMsg.streaming = false
+          if (lastMsg.content === '') {
+            lastMsg.content = 'Sorry, an error occurred.'
           }
         }
         loading.value = false
       },
       () => {
-        // Stream complete
-        if (messages.value.length > 0 && messages.value[messages.value.length - 1].role === 'assistant') {
-          messages.value[messages.value.length - 1].streaming = false
+        const lastMsg = messages.value[msgIndex]
+        if (lastMsg) {
+          lastMsg.streaming = false
         }
         loading.value = false
         abortStream = null
       }
     )
   } else {
-    // Non‑stream response
-    try {
-      const response = await chat(request)
-      addMessage('assistant', response.content)
-    } catch (error) {
-      console.error('Chat error:', error)
-      ElMessage.error('Failed to get response')
-    } finally {
-      loading.value = false
-    }
+    let pendingStepNumber: number | null = null
+    abortStream = streamReActAgentChat(
+      request,
+      (event) => {
+        const lastMsg = messages.value[msgIndex]
+        if (!lastMsg || !lastMsg.reactData) return
+
+        const { type, data } = event
+
+        // 缓存 step 事件，等收到非错误事件时再真正推入数组，避免推入又弹出导致页面抖动
+        if (type === 'step') {
+          pendingStepNumber = data
+          return
+        }
+
+        // 错误事件：丢弃缓存的 step，不触发任何渲染
+        if (type === 'error') {
+          pendingStepNumber = null
+          return
+        }
+
+        // 真实内容事件：先提交缓存的 step，再处理数据
+        if (pendingStepNumber !== null) {
+          lastMsg.reactData.steps.push({ stepNumber: pendingStepNumber })
+          pendingStepNumber = null
+        }
+
+        if (type === 'thought') {
+          const steps = lastMsg.reactData.steps
+          if (steps.length > 0) {
+            steps[steps.length - 1].thought = data
+          }
+        } else if (type === 'action') {
+          const steps = lastMsg.reactData.steps
+          if (steps.length > 0) {
+            steps[steps.length - 1].action = data
+          }
+        } else if (type === 'observation') {
+          const steps = lastMsg.reactData.steps
+          if (steps.length > 0) {
+            steps[steps.length - 1].observation = data
+          }
+        } else if (type === 'final_answer') {
+          lastMsg.reactData.finalAnswer = data
+          lastMsg.content = data
+        }
+
+        scrollToBottom()
+      },
+      (error) => {
+        console.error('ReActAgent stream error:', error)
+        ElMessage.error('Failed to get response')
+        const lastMsg = messages.value[msgIndex]
+        if (lastMsg) {
+          lastMsg.streaming = false
+          if (lastMsg.content === '') {
+            lastMsg.content = 'Sorry, an error occurred.'
+          }
+        }
+        loading.value = false
+      },
+      () => {
+        const lastMsg = messages.value[msgIndex]
+        if (lastMsg) {
+          lastMsg.streaming = false
+        }
+        loading.value = false
+        abortStream = null
+      }
+    )
   }
 }
 
@@ -291,19 +473,15 @@ const handleLogout = () => {
   router.push('/login')
 }
 
-// Auto‑focus input on mount
 onMounted(() => {
-  // Generate session ID for chat history
   const userId = authStore.userInfo?.userId || 'anonymous'
   const timestamp = Date.now()
   const random = Math.random().toString(36).substring(2, 9)
   sessionId.value = `session-${userId}-${timestamp}-${random}`
-  console.log('Chat session ID:', sessionId.value)
 })
 </script>
 
 <style scoped>
-/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
 }
@@ -317,5 +495,101 @@ onMounted(() => {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #a1a1a1;
+}
+
+.markdown-body :deep(p) {
+  margin-bottom: 0.5rem;
+}
+
+.markdown-body :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  padding-left: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-body :deep(li) {
+  margin-bottom: 0.25rem;
+}
+
+.markdown-body :deep(code) {
+  background-color: #f3f4f6;
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.875em;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.markdown-body :deep(pre) {
+  background-color: #f8f9fa;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+  overflow-x: auto;
+  margin-bottom: 0.75rem;
+}
+
+.markdown-body :deep(pre code) {
+  background: none;
+  padding: 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.markdown-body :deep(h1),
+.markdown-body :deep(h2),
+.markdown-body :deep(h3),
+.markdown-body :deep(h4) {
+  font-weight: 600;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-body :deep(h1) { font-size: 1.25rem; }
+.markdown-body :deep(h2) { font-size: 1.125rem; }
+.markdown-body :deep(h3) { font-size: 1rem; }
+
+.markdown-body :deep(blockquote) {
+  border-left: 3px solid #d1d5db;
+  padding-left: 0.75rem;
+  margin: 0.5rem 0;
+  color: #6b7280;
+}
+
+.markdown-body :deep(a) {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.markdown-body :deep(hr) {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 0.75rem 0;
+}
+
+.markdown-body :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin-bottom: 0.75rem;
+}
+
+.markdown-body :deep(th),
+.markdown-body :deep(td) {
+  border: 1px solid #e5e7eb;
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  font-size: 0.875rem;
+}
+
+.markdown-body :deep(th) {
+  background-color: #f9fafb;
+  font-weight: 600;
+}
+
+.markdown-body :deep(strong) {
+  font-weight: 600;
 }
 </style>

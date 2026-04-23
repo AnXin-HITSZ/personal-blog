@@ -87,7 +87,7 @@ async def simple_agent_chat_stream(request: ChatRequest):
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 
-@app.post("/api/agent/react_agent/chat/stream")
+@app.post("/api/agent/chat/react_agent/stream")
 async def react_agent_chat_stream(request: ChatRequest):
     if not request.session_id or not request.messages:
         raise HTTPException(400, "参数错误")

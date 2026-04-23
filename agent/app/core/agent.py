@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union, Any
+from collections.abc import Iterator
 from .message import Message
 from .llm import AgentsLLM
 from ..tools.registry import ToolRegistry
@@ -29,7 +30,11 @@ class Agent(ABC):
         pass
 
     @abstractmethod
-    def run(self, input_text: str) -> str:
+    def run(
+            self,
+            input_text: str,
+            stream: bool = True
+    ) -> Union[str, Iterator[Dict[str, Any]]]:
         """
         运行 Agent
         """

@@ -38,11 +38,25 @@ export interface ChatMessage {
 export interface ChatRequest {
   sessionId: string
   messages: ChatMessage[]
-  stream?: boolean
 }
 
 export interface ChatResponse {
   content: string
   model?: string
   usage?: Record<string, any>
+}
+
+export type AgentType = 'simple' | 'react'
+
+export interface ReActStep {
+  stepNumber: number
+  thought?: string
+  action?: { tool: string; input: string }
+  observation?: string
+  error?: string
+}
+
+export interface ReActData {
+  steps: ReActStep[]
+  finalAnswer: string
 }
