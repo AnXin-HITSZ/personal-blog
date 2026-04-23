@@ -28,8 +28,9 @@ export const streamChat = (
   // 确保开启流式
   const payload: ChatRequest = {
     ...request,
-    isStream: true,
+    stream: true,
   }
+  console.log('Stream chat request payload:', JSON.stringify(payload))
 
   fetch(`${API_BASE}/api/agent/chat`, {
     method: 'POST',
@@ -115,8 +116,9 @@ export const chat = async (request: ChatRequest): Promise<ChatResponse> => {
 
   const payload: ChatRequest = {
     ...request,
-    isStream: false,
+    stream: false,
   }
+  console.log('Non-stream chat request payload:', JSON.stringify(payload))
 
   const response = await fetch(`${API_BASE}/api/agent/chat`, {
     method: 'POST',

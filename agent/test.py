@@ -1,5 +1,6 @@
 import os
 
+from app.agents.react_agent import ReActAgent
 from app.agents.simple_agent import SimpleAgent
 from app.core.llm import AgentsLLM
 from app.tools.default_tools import CurrentTimeTool
@@ -19,13 +20,13 @@ llm = AgentsLLM(
 tool_registry = ToolRegistry()
 tool_registry.register_tool(CurrentTimeTool())
 
-agent = SimpleAgent(
+agent = ReActAgent(
     LLM_MODEL_ID,
     llm,
-    tool_registry
+    tool_registry,
+    5
 )
 
-response_generator = agent.run("你好！你知道当前时间吗？", 3, True)
-
-for token in response_generator:
-    print(token, end="", flush=True)
+response_generator = agent.run("你好！你知道当前时间吗？")
+for response in response_generator:
+    print(response)

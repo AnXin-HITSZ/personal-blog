@@ -1,18 +1,39 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-    <nav class="bg-white shadow-sm border-b border-gray-200">
+    <nav class="bg-white shadow-lg border-b border-gray-200 sticky top-0 z-50">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
           <div class="flex items-center">
-            <router-link to="/" class="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
-              ← Back to Home
+            <router-link to="/" class="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:bg-gray-100 flex items-center space-x-1">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+              </svg>
+              <span>Back to Home</span>
             </router-link>
           </div>
-          <div class="flex items-center space-x-4">
-            <router-link to="/" class="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
+          <div class="flex items-center space-x-2">
+            <router-link
+              to="/"
+              exact-active-class="bg-blue-100 text-blue-700 border-blue-300 shadow-sm"
+              class="text-gray-700 hover:text-gray-900 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:bg-gray-100 border border-transparent"
+            >
               Home
             </router-link>
-            <el-button type="primary" @click="handleLogout" class="ml-4">
+            <router-link
+              to="/chat"
+              exact-active-class="bg-blue-100 text-blue-700 border-blue-300 shadow-sm"
+              class="text-gray-700 hover:text-gray-900 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:bg-gray-100 border border-transparent"
+            >
+              AI Chat
+            </router-link>
+            <router-link
+              to="/profile"
+              exact-active-class="bg-blue-100 text-blue-700 border-blue-300 shadow-sm"
+              class="text-gray-700 hover:text-gray-900 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:bg-gray-100 border border-transparent"
+            >
+              Profile
+            </router-link>
+            <el-button type="primary" @click="handleLogout" class="ml-4 shadow-md hover:shadow-lg transition-shadow">
               Logout
             </el-button>
           </div>

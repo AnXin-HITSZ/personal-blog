@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import StreamingResponse
 
+from app.agents.react_agent import ReActAgent
 from app.agents.simple_agent import SimpleAgent
 from app.core.llm import AgentsLLM
 from app.tools.registry import ToolRegistry
@@ -52,8 +53,8 @@ class ChatRequest(BaseModel):
         "populate_by_name": True
     }
 
-@app.post("/api/agent/chat/stream")
-async def chat_stream(request: ChatRequest):
+@app.post("/api/agent/chat/simple_agent/stream")
+async def simple_agent_chat_stream(request: ChatRequest):
     if not request.session_id or not request.messages:
         raise HTTPException(400, "参数错误")
 
@@ -82,6 +83,47 @@ async def chat_stream(request: ChatRequest):
             {"role": "assistant", "content": full_resp}
         ]
         RedisChatService.save_chat_history(session_id, new_history)
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+@app.post("/api/agent/react_agent/chat/stream")
+async def react_agent_chat_stream(request: ChatRequest):
+    if not request.session_id or not request.messages:
+        raise HTTPException(400, "参数错误")
+
+    user_input = request.messages[-1].content
+    session_id = request.session_id
+
+    history = RedisChatService.get_chat_history(session_id)
+
+    agent = ReActAgent(
+        LLM_MODEL_ID,
+        llm,
+        tool_registry
+    )
+
+    for msg in history:
+        agent.add_message(Message(**msg))
+
+    def generate():
+        final_resp = ""
+        for event in agent.run(user_input, stream=True):
+            event_type = event["type"]
+            event_data = event["data"]
+
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+            if event_type == "final_answer":
+                final_resp = event_data
+
+        if final_resp:
+            new_history = history + [
+                {"role": "user", "content": user_input},
+                {"role": "assistant", "content": final_resp}
+            ]
+            RedisChatService.save_chat_history(session_id, new_history)
+
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")

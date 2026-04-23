@@ -1,22 +1,36 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-    <nav class="bg-white shadow-sm border-b border-gray-200">
+    <nav class="bg-white shadow-lg border-b border-gray-200 sticky top-0 z-50">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
           <div class="flex items-center">
-            <h1 class="text-2xl font-bold text-gray-900">Personal Blog</h1>
+            <h1 class="text-2xl font-bold text-gray-900 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Personal Blog
+            </h1>
           </div>
-          <div class="flex items-center space-x-4">
-            <router-link to="/" class="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
+          <div class="flex items-center space-x-2">
+            <router-link
+              to="/"
+              exact-active-class="bg-blue-100 text-blue-700 border-blue-300 shadow-sm"
+              class="text-gray-700 hover:text-gray-900 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:bg-gray-100 border border-transparent"
+            >
               Home
             </router-link>
-            <router-link to="/chat" class="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium bg-blue-50">
+            <router-link
+              to="/chat"
+              exact-active-class="bg-blue-100 text-blue-700 border-blue-300 shadow-sm"
+              class="text-gray-700 hover:text-gray-900 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:bg-gray-100 border border-transparent"
+            >
               AI Chat
             </router-link>
-            <router-link to="/profile" class="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
+            <router-link
+              to="/profile"
+              exact-active-class="bg-blue-100 text-blue-700 border-blue-300 shadow-sm"
+              class="text-gray-700 hover:text-gray-900 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:bg-gray-100 border border-transparent"
+            >
               Profile
             </router-link>
-            <el-button type="primary" @click="handleLogout" class="ml-4">
+            <el-button type="primary" @click="handleLogout" class="ml-4 shadow-md hover:shadow-lg transition-shadow">
               Logout
             </el-button>
           </div>
@@ -102,9 +116,6 @@
           <div class="mt-3 flex justify-between items-center text-sm text-gray-500">
             <div>
               <el-checkbox v-model="enableStream" label="Stream response" />
-              <span class="ml-2">Temperature: </span>
-              <el-slider v-model="temperature" :min="0" :max="1" :step="0.1" :show-tooltip="true" style="width: 120px; display: inline-block; margin-left: 8px;" />
-              <span class="ml-2">{{ temperature.toFixed(1) }}</span>
             </div>
             <div>
               <el-button type="info" plain @click="handleClearChat" size="small">Clear Chat</el-button>
@@ -138,8 +149,10 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { streamChat, chat } from '@/api/agent'
 import type { ChatMessage, ChatRequest } from '@/types/api'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
 
 interface Message extends ChatMessage {
   timestamp: string
@@ -150,8 +163,8 @@ const messages = ref<Message[]>([])
 const inputMessage = ref('')
 const loading = ref(false)
 const enableStream = ref(true)
-const temperature = ref(0.7)
 const messagesContainer = ref<HTMLElement>()
+const sessionId = ref<string>('')
 
 let abortStream: (() => void) | null = null
 
@@ -169,7 +182,9 @@ const scrollToBottom = () => {
 
 const addMessage = (role: string, content: string, streaming = false) => {
   const timestamp = formatTime(new Date())
-  messages.value.push({ role, content, timestamp, streaming })
+  const message = { role, content, timestamp, streaming }
+  messages.value.push(message)
+  console.log(`Added ${role} message:`, { content, streaming })
   scrollToBottom()
 }
 
@@ -188,6 +203,7 @@ const handleSendMessage = async () => {
     abortStream = null
   }
   const text = inputMessage.value.trim()
+  console.log('User input text:', text)
   if (!text || loading.value) return
 
   // Add user message
@@ -201,10 +217,17 @@ const handleSendMessage = async () => {
     loading.value = true
   }
 
+  // 过滤掉内容为空的消息（避免发送占位符消息给后端）
+  const filteredMessages = messages.value
+    .filter(m => m.content.trim() !== '')
+    .map(m => ({ role: m.role, content: m.content }))
+
+  console.log('Sending messages to backend:', filteredMessages)
+
   const request: ChatRequest = {
-    messages: messages.value.map(m => ({ role: m.role, content: m.content })),
-    temperature: temperature.value,
-    isStream: enableStream.value,
+    sessionId: sessionId.value,
+    messages: filteredMessages,
+    stream: enableStream.value,
   }
 
   if (enableStream.value) {
@@ -270,7 +293,12 @@ const handleLogout = () => {
 
 // Auto‑focus input on mount
 onMounted(() => {
-  // Optional: load previous messages from localStorage?
+  // Generate session ID for chat history
+  const userId = authStore.userInfo?.userId || 'anonymous'
+  const timestamp = Date.now()
+  const random = Math.random().toString(36).substring(2, 9)
+  sessionId.value = `session-${userId}-${timestamp}-${random}`
+  console.log('Chat session ID:', sessionId.value)
 })
 </script>
 

@@ -36,9 +36,9 @@ export interface ChatMessage {
 }
 
 export interface ChatRequest {
+  sessionId: string
   messages: ChatMessage[]
-  temperature?: number
-  isStream?: boolean
+  stream?: boolean
 }
 
 export interface ChatResponse {

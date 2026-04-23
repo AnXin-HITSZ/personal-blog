@@ -32,45 +32,20 @@ class SimpleAgent(Agent):
             self,
             input_text: str,
             max_tool_iterations: int = 3,
-            stream=True,
-            **kwargs
+            stream=True
     ) -> Union[str, Iterator[str]]:
         """
         运行 SimpleAgent
         """
-        messages = self._build_messages(input_text)
+        enhanced_system_prompt = self._get_enhanced_system_prompt()
+        messages = self._build_messages(enhanced_system_prompt, input_text)
 
-        final_messages = self._execute_tool_loop(messages, max_tool_iterations, **kwargs)
+        final_messages = self._execute_tool_loop(messages, max_tool_iterations)
 
         if stream:
-            return self._stream_final_response(input_text, final_messages, **kwargs)
+            return self._stream_final_response(final_messages)
         else:
-            return self._non_stream_final_response(input_text, final_messages, **kwargs)
-
-    def _build_messages(self, input_text: str) -> List[Dict[str, str]]:
-        """
-        构建消息列表
-        """
-        messages = []
-
-        enhanced_prompt = self._get_enhanced_system_prompt()
-        messages.append({
-            "role": "system",
-            "content": enhanced_prompt
-        })
-
-        for msg in self._history:
-            messages.append({
-                "role": msg.role,
-                "content": msg.content
-            })
-
-        messages.append({
-            "role": "user",
-            "content": input_text
-        })
-
-        return messages
+            return self._non_stream_final_response(final_messages)
 
     def _get_enhanced_system_prompt(self) -> str:
         """
@@ -144,7 +119,6 @@ class SimpleAgent(Agent):
 
     def _non_stream_final_response(
             self,
-            input_text: str,
             final_messages: list,
             **kwargs
     ):
@@ -152,14 +126,11 @@ class SimpleAgent(Agent):
         非流式输出
         """
         final_response = self.llm.invoke(final_messages, **kwargs)
-        self.add_message(Message(input_text, "user"))
-        self.add_message(Message(final_response, "assistant"))
 
         return final_response
 
     def _stream_final_response(
             self,
-            input_text: str,
             final_messages: list,
             **kwargs
     ) -> Iterator[str]:
@@ -172,6 +143,3 @@ class SimpleAgent(Agent):
         for dr in delta_response:
             final_response += dr
             yield dr
-
-        self.add_message(Message(input_text, "user"))
-        self.add_message(Message(final_response, "assistant"))

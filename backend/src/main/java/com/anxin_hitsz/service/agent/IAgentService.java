@@ -13,5 +13,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  * @Version 1.0
  */
 public interface IAgentService {
-    SseEmitter streamChat(ChatRequest chatRequest);
+    SseEmitter chatSimpleAgentStream(ChatRequest request);
+
+    SseEmitter chatReActAgentStream(ChatRequest request);
 }

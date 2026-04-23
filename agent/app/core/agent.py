@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Any
+from typing import Optional, List, Dict
 from .message import Message
 from .llm import AgentsLLM
 from ..tools.registry import ToolRegistry
@@ -22,11 +22,42 @@ class Agent(ABC):
         self._history: list[Message] = []
 
     @abstractmethod
-    def run(self, input_text: str, max_tool_iterations: int, **kwargs) -> str:
+    def _get_enhanced_system_prompt(self) -> str:
+        """
+        构建增强的系统提示词，包含工具信息
+        """
+        pass
+
+    @abstractmethod
+    def run(self, input_text: str) -> str:
         """
         运行 Agent
         """
         pass
+
+    def _build_messages(self, enhanced_system_prompt: str, input_text: str) -> List[Dict[str, str]]:
+        """
+        构建消息列表
+        """
+        messages = []
+
+        messages.append({
+            "role": "system",
+            "content": enhanced_system_prompt
+        })
+
+        for msg in self._history:
+            messages.append({
+                "role": msg.role,
+                "content": msg.content
+            })
+
+        messages.append({
+            "role": "user",
+            "content": input_text
+        })
+
+        return messages
 
     def add_message(self, message: Message):
         """

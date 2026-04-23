@@ -2,8 +2,11 @@ package com.anxin_hitsz.controller.agent;
 
 import com.anxin_hitsz.dto.agent.ChatRequest;
 import com.anxin_hitsz.service.agent.IAgentService;
+import com.anxin_hitsz.service.impl.user.account.UserDetailsImpl;
 import jakarta.annotation.Resource;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,10 +30,28 @@ public class AgentController {
     private IAgentService agentService;
 
     /**
-     * 与 LLM 日常交流 - 流式响应
+     * SimpleAgent - 流式响应
      */
-    @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter chat(@RequestBody ChatRequest request) {
-        return agentService.streamChat(request);
+    @PostMapping(value = "/chat/simple_agent/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter chatSimpleAgentStream(
+            @RequestBody ChatRequest request,
+            Authentication authentication
+    ) {
+        UserDetailsImpl loginUser = (UserDetailsImpl) authentication.getPrincipal();
+        request.setSessionId(loginUser.getUser().getUserId().toString());
+        return agentService.chatSimpleAgentStream(request);
+    }
+
+    /**
+     * ReActAgent - 流式响应
+     */
+    @PostMapping(value = "/chat/react_agent/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter chatReActAgentStream(
+            @RequestBody ChatRequest request,
+            Authentication authentication
+    ) {
+        UserDetailsImpl loginUser = (UserDetailsImpl) authentication.getPrincipal();
+        request.setSessionId(loginUser.getUser().getUserId().toString());
+        return agentService.chatReActAgentStream(request);
     }
 }

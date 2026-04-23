@@ -27,11 +27,37 @@ public class AgentServiceImpl implements IAgentService {
         this.webClient = webClient;
     }
 
-    public SseEmitter streamChat(ChatRequest request) {
+    @Override
+    public SseEmitter chatSimpleAgentStream(ChatRequest request) {
         SseEmitter emitter = new SseEmitter(60 * 1000L);
 
         webClient.post()
-                .uri("/api/agent/chat/stream")
+                .uri("/api/agent/chat/simple_agent/stream")
+                .bodyValue(request)
+                .accept(MediaType.TEXT_PLAIN)
+                .retrieve()
+                .bodyToFlux(String.class)
+                .subscribe(
+                        chunk -> {
+                            try {
+                                emitter.send(chunk);
+                            } catch (Exception e) {
+                                emitter.completeWithError(e);
+                            }
+                        },
+                        emitter::completeWithError,
+                        emitter::complete
+                );
+
+        return emitter;
+    }
+
+    @Override
+    public SseEmitter chatReActAgentStream(ChatRequest request) {
+        SseEmitter emitter = new SseEmitter(60 * 1000L);
+
+        webClient.post()
+                .uri("/api/agent/chat/react_agent/stream")
                 .bodyValue(request)
                 .accept(MediaType.TEXT_PLAIN)
                 .retrieve()
