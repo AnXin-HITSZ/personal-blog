@@ -4,6 +4,7 @@ import json
 from .client import redis_client
 from .config import REDIS_CHAT_HISTORY_KEY_PREFIX, CHAT_SESSION_EXPIRE
 
+
 class RedisChatService:
     """
     AI 对话历史 Redis 服务

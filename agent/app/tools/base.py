@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List
-
 from pydantic import BaseModel
 
 
@@ -39,4 +38,3 @@ class Tool(ABC):
         执行工具，返回工具执行结果
         """
         pass
-

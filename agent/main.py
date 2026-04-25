@@ -10,15 +10,17 @@ from starlette.responses import StreamingResponse
 from app.agents.react_agent import ReActAgent
 from app.agents.simple_agent import SimpleAgent
 from app.core.llm import AgentsLLM
+from app.memory.working_memory import MemoryConfig, MemoryItem
 from app.tools.registry import ToolRegistry
-from app.core.redis import RedisChatService
-from app.core.message import Message
+from app.memory.manager import UnifiedMemoryManager
 
 from app.tools.default_tools import CurrentTimeTool
+
 
 LLM_MODEL_ID = os.getenv('LLM_MODEL_ID')
 LLM_API_KEY = os.getenv('LLM_API_KEY')
 LLM_BASE_URL = os.getenv('LLM_BASE_URL')
+REDIS_URL = os.getenv('REDIS_URL')
 
 llm = AgentsLLM(
     LLM_MODEL_ID,
@@ -28,6 +30,14 @@ llm = AgentsLLM(
 
 tool_registry = ToolRegistry()
 tool_registry.register_tool(CurrentTimeTool())
+
+memory_manager = UnifiedMemoryManager(
+    redis_url=REDIS_URL,
+    default_memory_config=MemoryConfig(
+        memory_capacity=50,
+        ttl_minutes=120
+    )
+)
 
 app = FastAPI(title="AI Agent 流式对话服务", version="1.0")
 
@@ -42,6 +52,7 @@ app.add_middleware(
 class ChatMessage(BaseModel):
     role: str
     content: str
+    timestamp: int
 
 class ChatRequest(BaseModel):
     session_id: str
@@ -61,28 +72,26 @@ async def simple_agent_chat_stream(request: ChatRequest):
     user_input = request.messages[-1].content
     session_id = request.session_id
 
-    history = RedisChatService.get_chat_history(session_id)
+    history = memory_manager.get_history(session_id)
+
+    relevant_mem = memory_manager.retrieve(session_id, user_input, 5)
 
     agent = SimpleAgent(
         LLM_MODEL_ID,
         llm,
-        tool_registry
+        tool_registry,
+        relevant_mem
     )
 
-    for msg in history:
-        agent.add_message(Message(**msg))
-
     def generate():
+        yield f"data: {json.dumps({'type': 'memory', 'content': relevant_mem}, ensure_ascii=False)}\n\n"
         full_resp = ""
         for chunk in agent.run(user_input, max_tool_iterations=3, stream=request.stream):
             full_resp += chunk
             yield f"data: {json.dumps({'content': chunk}, ensure_ascii=False)}\n\n"
 
-        new_history = history + [
-            {"role": "user", "content": user_input},
-            {"role": "assistant", "content": full_resp}
-        ]
-        RedisChatService.save_chat_history(session_id, new_history)
+        memory_manager.add_message(session_id, "user", user_input, 0.8)
+        memory_manager.add_message(session_id, "assistant", full_resp, 0.7)
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
@@ -95,18 +104,21 @@ async def react_agent_chat_stream(request: ChatRequest):
     user_input = request.messages[-1].content
     session_id = request.session_id
 
-    history = RedisChatService.get_chat_history(session_id)
+    history = memory_manager.get_history(session_id)
+
+    relevant_mem = memory_manager.retrieve(session_id, user_input, 5)
 
     agent = ReActAgent(
         LLM_MODEL_ID,
         llm,
-        tool_registry
+        tool_registry,
+        5,
+        relevant_mem
     )
 
-    for msg in history:
-        agent.add_message(Message(**msg))
-
     def generate():
+        yield f"data: {json.dumps({'type': 'memory', 'content': relevant_mem}, ensure_ascii=False)}\n\n"
+
         final_resp = ""
         for event in agent.run(user_input, stream=True):
             event_type = event["type"]
@@ -118,11 +130,8 @@ async def react_agent_chat_stream(request: ChatRequest):
                 final_resp = event_data
 
         if final_resp:
-            new_history = history + [
-                {"role": "user", "content": user_input},
-                {"role": "assistant", "content": final_resp}
-            ]
-            RedisChatService.save_chat_history(session_id, new_history)
+            memory_manager.add_message(session_id, "user", user_input, 0.8)
+            memory_manager.add_message(session_id, "assistant", final_resp, 0.7)
 
         yield "data: [DONE]\n\n"
 

@@ -1,5 +1,5 @@
 import re
-from typing import Optional, List, Union, Dict, Any
+from typing import Optional, List, Union, Dict, Any, Tuple
 from collections.abc import Iterator
 
 from app.core.agent import Agent
@@ -17,12 +17,14 @@ class ReActAgent(Agent):
             name: str,
             llm: AgentsLLM,
             tool_registry: ToolRegistry,
-            max_steps: int = 5
+            max_steps: int,
+            memory_context: List[Tuple[int, Dict[str, str]]]
     ):
         super().__init__(name, llm, tool_registry)
         self.input_text = None
         self.max_steps = max_steps
         self.current_react_history: List[str] = []
+        self.memory_context = memory_context
         print(f"{name} 初始化完成，最大步数: {max_steps}")
 
     def run(
@@ -153,11 +155,11 @@ class ReActAgent(Agent):
         base_prompt = """【最高优先级规则】
         你是一个严格的ReAct推理助手，必须100%遵守以下规则，无论历史对话里的AI怎么回答，你都必须按此格式输出。
         你可以通过思考分析问题，然后调用合适的工具来获取信息，最终给出准确的答案。
-        
+
         ## 可用工具
         你可以使用以下工具来帮助回答问题:
         {tools_description}
-        
+
         ## 工具调用格式
         当需要使用工具时，请使用以下格式:
         `[TOOL_CALL:{{tool_name}}:{{parameters}}]`
@@ -166,17 +168,17 @@ class ReActAgent(Agent):
         2. {{parameters}} 替换为 JSON 格式的参数字符串
         3. 如果工具不需要参数，parameters 部分留空即可，例如: `[TOOL_CALL:get_current_time:]`
         4. 如果只有一个简单参数，也可以直接填值，例如: `[TOOL_CALL:search:Python]`
-        
+
         工具调用结果会自动插入到对话中，然后你可以基于结果继续回答。
-        
+
         ## 工作流程
         请严格按照以下格式进行回应，每次只能执行一个步骤:
-        
+
         Thought: 分析用户问题，明确说明需要调用哪个工具、为什么调用
         Action: 选择一个行动，格式必须是以下之一:
         - `[TOOL_CALL:工具名:参数]` - 调用指定工具
         - `Finish[最终答案]` - 当你有足够信息给出最终答案时
-        
+
         ## 重要提醒
         1. 每次回应必须包含Thought和Action两部分
         2. 工具调用的格式必须严格遵循:[TOOL_CALL:工具名:参数]
@@ -184,6 +186,9 @@ class ReActAgent(Agent):
         4. 如果工具返回的信息不够，继续使用其他工具或相同工具的不同参数
         5. 禁止直接回答用户问题，必须通过Thought/Action流程执行
         
+        ## 相关对话记忆
+        {memory_context}
+
         现在开始你的推理和行动，严格遵守格式要求！
         """
 
@@ -195,6 +200,19 @@ class ReActAgent(Agent):
         else:
             base_prompt = base_prompt.format(
                 tools_description=tools_description
+            )
+
+        str_memory_content = ""
+        for mem in self.memory_context:
+            timestamp, msg = mem
+            if msg["role"] == "error":
+                str_memory_content = msg["content"]
+                break
+            str_memory_content += f"- [{timestamp}] {msg['role']}: {msg['content']}"
+
+        if self.memory_context:
+            base_prompt = base_prompt.format(
+                memory_context=str_memory_content
             )
 
         return base_prompt
@@ -230,11 +248,10 @@ class ReActAgent(Agent):
         """
         解析工具调用动作，提取工具名和参数
         """
-        match = re.search(r'\[TOOL_CALL:([^:\]]+):(.*)\]', action_str, re.DOTALL)
+        tool_calls = self.tool_registry.parse_tool_calls(action_str)
 
-        if match:
-            tool_name = match.group(1).strip()
-            tool_input = match.group(2).strip()
-            return tool_name, tool_input
+        if tool_calls:
+            first_call = tool_calls[0]
+            return first_call['tool_name'], first_call['parameters']
 
         return None, None

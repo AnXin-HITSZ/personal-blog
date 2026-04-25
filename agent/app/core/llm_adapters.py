@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Iterator, List
 
+
 class BaseLLMAdapter(ABC):
     """
     LLM 适配器基类
@@ -17,16 +18,17 @@ class BaseLLMAdapter(ABC):
         """
         创建客户端实例
         """
+        pass
 
     @abstractmethod
-    def invoke(self, message: List[Dict], **kwargs) -> str:
+    def invoke(self, message: List[Dict]) -> str:
         """
         非流式调用
         """
         pass
 
     @abstractmethod
-    def stream_invoke(self, message: List[Dict], **kwargs) -> Iterator[str]:
+    def stream_invoke(self, message: List[Dict]) -> Iterator[str]:
         """
         流式调用，返回生成器
         """
@@ -48,7 +50,7 @@ class OpenAIAdapter(BaseLLMAdapter):
             base_url=self.base_url
         )
 
-    def invoke(self, message: List[Dict], **kwargs) -> str:
+    def invoke(self, message: List[Dict]) -> str:
         """
         非流式调用
         """
@@ -57,8 +59,7 @@ class OpenAIAdapter(BaseLLMAdapter):
 
         response = self._client.chat.completions.create(
             model=self.model,
-            messages=message,
-            **kwargs
+            messages=message
         )
 
         choice = response.choices[0]
@@ -66,7 +67,7 @@ class OpenAIAdapter(BaseLLMAdapter):
 
         return content
 
-    def stream_invoke(self, messages: List[Dict], **kwargs) -> Iterator[str]:
+    def stream_invoke(self, messages: List[Dict]) -> Iterator[str]:
         """
         流式调用
         """
@@ -76,8 +77,7 @@ class OpenAIAdapter(BaseLLMAdapter):
         response = self._client.chat.completions.create(
             model=self.model,
             messages=messages,
-            stream=True,
-            **kwargs
+            stream=True
         )
 
         collected_content = []

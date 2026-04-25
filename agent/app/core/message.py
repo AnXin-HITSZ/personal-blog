@@ -1,7 +1,7 @@
-from importlib.metadata import metadata
 from typing import Optional, Dict, Any, Literal
 from datetime import datetime
 from pydantic import BaseModel
+
 
 MessageRole = Literal["user", "assistant", "system", "tool"]
 
@@ -15,12 +15,10 @@ class Message(BaseModel):
     timestamp: datetime
     metadata: Optional[Dict[str, Any]] = None
 
-    def __init__(self, content: str, role: MessageRole, **kwargs):
+    def __init__(self, content: str, role: MessageRole):
         super().__init__(
             content=content,
-            role=role,
-            timestamp=kwargs.get("timestamp", datetime.now()),
-            metadata=kwargs.get("metadata", {})
+            role=role
         )
 
     def to_dict(self) -> Dict[str, Any]:

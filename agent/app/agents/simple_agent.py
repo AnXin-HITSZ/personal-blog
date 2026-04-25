@@ -1,11 +1,9 @@
 from collections.abc import Iterator
-from typing import Optional, Dict, List, Any, Union
-import re
+from typing import Optional, Dict, List, Any, Union, Tuple
 
 from app.core.agent import Agent
 from app.core.llm import AgentsLLM
 from app.tools.registry import ToolRegistry
-from app.core.message import Message
 
 
 class SimpleAgent(Agent):
@@ -17,7 +15,8 @@ class SimpleAgent(Agent):
             self,
             name: str,
             llm: AgentsLLM,
-            tool_registry: Optional['ToolRegistry'] = None
+            tool_registry: Optional['ToolRegistry'],
+            memory_context: List[Tuple[int, Dict[str, str]]]
     ):
         """
         初始化 SimpleAgent
@@ -27,6 +26,7 @@ class SimpleAgent(Agent):
             llm,
             tool_registry
         )
+        self.memory_context = memory_context
 
     def run(
             self,
@@ -57,27 +57,58 @@ class SimpleAgent(Agent):
         if not tools_description or tools_description == "暂无可用工具":
             return base_prompt
 
-        tools_section = "\n\n## 可用工具\n"
-        tools_section += "你可以使用以下工具来帮助回答问题:\n"
-        tools_section += tools_description + "\n"
+        base_prompt  ="""你是一个有用的AI助手。
+        
+        ## 可用工具
+        你可以使用以下工具来帮助回答问题:
+        {tools_description}
+        
+        ## 工具调用格式
+        当需要使用工具时，请使用以下格式:
+        `[TOOL_CALL:{tool_name}:{parameters}]`
+        要求:
+        1. {tool_name} 替换为工具名称
+        2. {parameters} 替换为 JSON 格式的参数字符串
+        3. 如果工具不需要参数，parameters 部分留空即可，例如: `[TOOL_CALL:get_current_time:]`
+        4. 如果只有一个简单参数，也可以直接填值，例如: `[TOOL_CALL:search:Python]`
+        
+        工具调用结果会自动插入到对话中，然后你可以基于结果继续回答。
+        
+        ## 相关对话记忆
+        {memory_context}
+        
+        现在开始你的回答:
+        """
 
-        tools_section += "\n## 工具调用格式\n"
-        tools_section += "当需要使用工具时，请使用以下格式:\n"
-        tools_section += "`[TOOL_CALL:{tool_name}:{parameters}]`\n"
-        tools_section += "要求:\n"
-        tools_section += "1. {tool_name} 替换为工具名称\n"
-        tools_section += "2. {parameters} 替换为 JSON 格式的参数字符串\n"
-        tools_section += "3. 如果工具不需要参数，parameters 部分留空即可，例如: `[TOOL_CALL:get_current_time:]`\n"
-        tools_section += "4. 如果只有一个简单参数，也可以直接填值，例如: `[TOOL_CALL:search:Python]`\n\n"
-        tools_section += "工具调用结果会自动插入到对话中，然后你可以基于结果继续回答。\n"
+        if not tools_description or tools_description == "暂无可用工具":
+            base_prompt = base_prompt.replace(
+                "{tools_description}",
+                "暂无可用工具。请直接回答用户问题，禁止调用工具。"
+            )
+        else:
+            base_prompt = base_prompt.format(
+                tools_description=tools_description
+            )
 
-        return base_prompt + tools_section
+        str_memory_content = ""
+        for mem in self.memory_context:
+            timestamp, msg = mem
+            if msg["role"] == "error":
+                str_memory_content = msg["content"]
+                break
+            str_memory_content += f"- [{timestamp}] {msg['role']}: {msg['content']}"
+
+        if self.memory_context:
+            base_prompt = base_prompt.format(
+                memory_context=str_memory_content
+            )
+
+        return base_prompt
 
     def _execute_tool_loop(
             self,
             messages: List[Dict[str, Any]],
-            max_tool_iterations: int,
-            **kwargs
+            max_tool_iterations: int
     ) -> list:
         """
         运行工具调用，返回最终的 messages 列表
@@ -85,7 +116,7 @@ class SimpleAgent(Agent):
         current_iteration = 0
 
         while current_iteration < max_tool_iterations:
-            response = self.llm.invoke(messages, **kwargs)
+            response = self.llm.invoke(messages)
 
             tool_calls = self.tool_registry.parse_tool_calls(response)
 
@@ -119,26 +150,24 @@ class SimpleAgent(Agent):
 
     def _non_stream_final_response(
             self,
-            final_messages: list,
-            **kwargs
+            final_messages: list
     ):
         """
         非流式输出
         """
-        final_response = self.llm.invoke(final_messages, **kwargs)
+        final_response = self.llm.invoke(final_messages)
 
         return final_response
 
     def _stream_final_response(
             self,
-            final_messages: list,
-            **kwargs
+            final_messages: list
     ) -> Iterator[str]:
         """
         流式输出
         """
         final_response = ""
-        delta_response = self.llm.stream_invoke(final_messages, **kwargs)
+        delta_response = self.llm.stream_invoke(final_messages)
 
         for dr in delta_response:
             final_response += dr

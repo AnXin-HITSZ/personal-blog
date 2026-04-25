@@ -4,6 +4,7 @@ import json
 
 from app.tools.base import Tool
 
+
 class ToolRegistry:
     """
     Agents 工具注册表
