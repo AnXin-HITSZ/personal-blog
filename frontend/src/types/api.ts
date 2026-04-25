@@ -33,6 +33,7 @@ export interface Article {
 export interface ChatMessage {
   role: string
   content: string
+  timestamp?: number
 }
 
 export interface ChatRequest {
@@ -54,6 +55,12 @@ export interface ReActStep {
   action?: { tool: string; input: string }
   observation?: string
   error?: string
+}
+
+export interface MemoryItem {
+  timestamp: string
+  role: string
+  content: string
 }
 
 export interface ReActData {

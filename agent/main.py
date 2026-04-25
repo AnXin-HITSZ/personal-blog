@@ -91,6 +91,8 @@ async def simple_agent_chat_stream(request: ChatRequest):
             yield f"data: {json.dumps({'content': chunk}, ensure_ascii=False)}\n\n"
 
         memory_manager.add_message(session_id, "user", user_input, 0.8)
+        print(full_resp
+              )
         memory_manager.add_message(session_id, "assistant", full_resp, 0.7)
         yield "data: [DONE]\n\n"
 

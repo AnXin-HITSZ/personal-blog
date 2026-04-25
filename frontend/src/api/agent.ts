@@ -1,4 +1,4 @@
-import type { ChatRequest } from '@/types/api'
+import type { ChatRequest, MemoryItem } from '@/types/api'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
 
@@ -8,6 +8,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
 export const streamSimpleAgentChat = (
   request: ChatRequest,
   onMessage: (chunk: string) => void,
+  onMemory?: (memories: MemoryItem[]) => void,
   onError?: (error: any) => void,
   onComplete?: () => void
 ): (() => void) => {
@@ -58,7 +59,11 @@ export const streamSimpleAgentChat = (
               if (data === '') continue
               try {
                 const parsed = JSON.parse(data)
-                onMessage(parsed.content ?? data)
+                if (parsed.type === 'memory') {
+                  onMemory?.(parsed.content)
+                } else {
+                  onMessage(parsed.content ?? data)
+                }
               } catch (_e) {
                 onMessage(data)
               }
@@ -136,6 +141,10 @@ export const streamReActAgentChat = (
               if (data === '') continue
               try {
                 const parsed = JSON.parse(data)
+                // 统一事件格式：memory 事件使用 content 字段，转为 data 字段以便解构
+                if (parsed.type === 'memory' && 'content' in parsed) {
+                  parsed.data = parsed.content
+                }
                 onEvent(parsed)
               } catch (_e) {
                 console.warn('Failed to parse ReAct event:', data)

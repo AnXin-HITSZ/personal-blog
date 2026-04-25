@@ -131,7 +131,7 @@ class WorkingMemory:
         self.redis.hset(key_meta, item.id, item.to_json())
         self.redis.rpush(key_index, item.id)
 
-        current_length = self.redis.llen(key_meta)
+        current_length = self.redis.llen(key_index)
         if current_length > self.max_capacity:
             self._remove_lowest_priority_memory(session_id)
 
@@ -235,7 +235,10 @@ class WorkingMemory:
         if not all_memories:
             return [(
                 0,
-                {"error": "暂无相关对话记忆"}
+                {
+                    "role": "error",
+                    "content": "暂无相关对话记忆"
+                }
             )]
 
         vector_scores = self._try_tfidf_search(query, all_memories)
@@ -269,7 +272,7 @@ class WorkingMemory:
 
         result = []
         for mem in relevant:
-            dt = mem.get_timestamp_datetime().strftime("%H:%M")
+            dt = mem.get_timestamp().strftime("%H:%M")
             result.append((
                 dt,
                 {
@@ -360,6 +363,6 @@ class WorkingMemory:
         final_score = min(score, 1.0)
 
         if matched_words:
-            print(f"[匹配] 查询: {query} | 匹配词: {matched_words} | 分数: {final_score:.2f}")
+            print(f"[匹配] 查询: {query} | 记忆: {content} |匹配词: {matched_words} | 分数: {final_score:.2f}")
 
         return final_score

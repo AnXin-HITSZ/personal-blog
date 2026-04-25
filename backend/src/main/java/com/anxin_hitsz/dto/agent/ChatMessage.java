@@ -23,4 +23,9 @@ public class ChatMessage {
      */
     private String content;
 
+    /**
+     * 时间戳
+     */
+    private Long timestamp;
+
 }

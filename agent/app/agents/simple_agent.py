@@ -65,10 +65,10 @@ class SimpleAgent(Agent):
         
         ## 工具调用格式
         当需要使用工具时，请使用以下格式:
-        `[TOOL_CALL:{tool_name}:{parameters}]`
+        `[TOOL_CALL:{{tool_name}}:{{parameters}}]`
         要求:
-        1. {tool_name} 替换为工具名称
-        2. {parameters} 替换为 JSON 格式的参数字符串
+        1. {{tool_name}} 替换为工具名称
+        2. {{parameters}} 替换为 JSON 格式的参数字符串
         3. 如果工具不需要参数，parameters 部分留空即可，例如: `[TOOL_CALL:get_current_time:]`
         4. 如果只有一个简单参数，也可以直接填值，例如: `[TOOL_CALL:search:Python]`
         
@@ -80,16 +80,6 @@ class SimpleAgent(Agent):
         现在开始你的回答:
         """
 
-        if not tools_description or tools_description == "暂无可用工具":
-            base_prompt = base_prompt.replace(
-                "{tools_description}",
-                "暂无可用工具。请直接回答用户问题，禁止调用工具。"
-            )
-        else:
-            base_prompt = base_prompt.format(
-                tools_description=tools_description
-            )
-
         str_memory_content = ""
         for mem in self.memory_context:
             timestamp, msg = mem
@@ -99,9 +89,19 @@ class SimpleAgent(Agent):
             str_memory_content += f"- [{timestamp}] {msg['role']}: {msg['content']}"
 
         if self.memory_context:
-            base_prompt = base_prompt.format(
-                memory_context=str_memory_content
-            )
+            if not tools_description or tools_description == "暂无可用工具":
+                base_prompt = base_prompt.replace(
+                    "{tools_description}",
+                    "暂无可用工具。请直接使用 Finish[你的完整答案] 来回答用户问题，禁止调用工具。"
+                )
+                base_prompt = base_prompt.format(
+                    memory_context=str_memory_content
+                )
+            else:
+                base_prompt = base_prompt.format(
+                    tools_description=tools_description,
+                    memory_context=str_memory_content
+                )
 
         return base_prompt
 

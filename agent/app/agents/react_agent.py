@@ -90,6 +90,15 @@ class ReActAgent(Agent):
 
             if action:
                 tool_name, tool_input = self._parse_action(action)
+                if tool_name is None:
+                    yield {"type": "error", "data": "无法解析工具调用，正在调整 ……"}
+                    messages.append({
+                        "role": "user",
+                        "content": "Action 格式错误，请确保包含 [TOOL_CALL:工具名:参数] 格式。如果已有足够信息，请使用 Finish[答案] 直接回答。"
+                    })
+                    current_step -= 1
+                    continue
+
                 yield {"type": "action", "data": {"tool": tool_name, "input": tool_input}}
 
                 observation = self.tool_registry.execute_tool(tool_name, tool_input)
@@ -192,16 +201,6 @@ class ReActAgent(Agent):
         现在开始你的推理和行动，严格遵守格式要求！
         """
 
-        if not tools_description or tools_description == "暂无可用工具":
-            base_prompt = base_prompt.replace(
-                "{tools_description}",
-                "暂无可用工具。请直接使用 Finish[你的完整答案] 来回答用户问题，禁止调用工具。"
-            )
-        else:
-            base_prompt = base_prompt.format(
-                tools_description=tools_description
-            )
-
         str_memory_content = ""
         for mem in self.memory_context:
             timestamp, msg = mem
@@ -211,9 +210,19 @@ class ReActAgent(Agent):
             str_memory_content += f"- [{timestamp}] {msg['role']}: {msg['content']}"
 
         if self.memory_context:
-            base_prompt = base_prompt.format(
-                memory_context=str_memory_content
-            )
+            if not tools_description or tools_description == "暂无可用工具":
+                base_prompt = base_prompt.replace(
+                    "{tools_description}",
+                    "暂无可用工具。请直接使用 Finish[你的完整答案] 来回答用户问题，禁止调用工具。"
+                )
+                base_prompt = base_prompt.format(
+                    memory_context=str_memory_content
+                )
+            else:
+                base_prompt = base_prompt.format(
+                    tools_description=tools_description,
+                    memory_context=str_memory_content
+                )
 
         return base_prompt
 

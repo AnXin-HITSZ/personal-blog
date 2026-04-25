@@ -114,6 +114,39 @@
             <div v-else-if="message.role === 'assistant' && !message.reactData" class="flex justify-start mb-4">
               <div class="max-w-[80%] rounded-2xl px-5 py-3 bg-gray-100 text-gray-800 rounded-bl-none">
                 <div class="font-medium mb-1">AI Assistant</div>
+
+                <!-- Memory Context -->
+                <div v-if="message.memories && message.memories.length > 0" class="mb-3">
+                  <button
+                    @click="message.memoriesCollapsed = !message.memoriesCollapsed"
+                    class="flex items-center space-x-1.5 text-xs font-medium text-amber-600 hover:text-amber-700 transition-colors"
+                  >
+                    <svg
+                      class="w-3 h-3 transition-transform duration-200"
+                      :class="{ 'rotate-90': !message.memoriesCollapsed }"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    <span>Memory Context ({{ message.memories.length }})</span>
+                  </button>
+                  <div v-show="!message.memoriesCollapsed" class="mt-2 space-y-1.5">
+                    <div
+                      v-for="(mem, mi) in message.memories"
+                      :key="mi"
+                      class="flex items-start gap-2 text-xs bg-amber-50/80 rounded-lg px-3 py-1.5 border border-amber-100"
+                    >
+                      <span class="text-gray-400 shrink-0 w-10 font-mono">{{ mem.timestamp }}</span>
+                      <span
+                        class="shrink-0 font-semibold px-1.5 py-0.5 rounded text-[10px] leading-tight"
+                        :class="mem.role === 'user' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'"
+                      >{{ mem.role }}</span>
+                      <span class="text-gray-600 truncate">{{ mem.content }}</span>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="markdown-body">
                   <div v-html="renderMarkdown(message.content)"></div>
                   <span v-if="message.streaming" class="inline-block w-2 h-4 ml-1 bg-gray-400 animate-pulse"></span>
@@ -126,6 +159,38 @@
             <div v-else-if="message.role === 'assistant' && message.reactData" class="flex justify-start mb-4">
               <div class="max-w-[85%] rounded-2xl px-5 py-3 bg-gray-100 text-gray-800 rounded-bl-none">
                 <div class="font-medium mb-1 text-purple-700">AI Assistant (ReAct)</div>
+
+                <!-- Memory Context -->
+                <div v-if="message.memories && message.memories.length > 0" class="mb-3">
+                  <button
+                    @click="message.memoriesCollapsed = !message.memoriesCollapsed"
+                    class="flex items-center space-x-1.5 text-xs font-medium text-amber-600 hover:text-amber-700 transition-colors"
+                  >
+                    <svg
+                      class="w-3 h-3 transition-transform duration-200"
+                      :class="{ 'rotate-90': !message.memoriesCollapsed }"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                    >
+                      <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    <span>Memory Context ({{ message.memories.length }})</span>
+                  </button>
+                  <div v-show="!message.memoriesCollapsed" class="mt-2 space-y-1.5">
+                    <div
+                      v-for="(mem, mi) in message.memories"
+                      :key="mi"
+                      class="flex items-start gap-2 text-xs bg-amber-50/80 rounded-lg px-3 py-1.5 border border-amber-100"
+                    >
+                      <span class="text-gray-400 shrink-0 w-10 font-mono">{{ mem.timestamp }}</span>
+                      <span
+                        class="shrink-0 font-semibold px-1.5 py-0.5 rounded text-[10px] leading-tight"
+                        :class="mem.role === 'user' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'"
+                      >{{ mem.role }}</span>
+                      <span class="text-gray-600 truncate">{{ mem.content }}</span>
+                    </div>
+                  </div>
+                </div>
 
                 <!-- Collapsible ReAct Process -->
                 <div v-if="message.reactData.steps.length > 0" class="mb-5">
@@ -257,7 +322,7 @@ import { ref, nextTick, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { streamSimpleAgentChat, streamReActAgentChat } from '@/api/agent'
-import type { ChatMessage, ChatRequest, AgentType, ReActData } from '@/types/api'
+import type { ChatMessage, ChatRequest, AgentType, ReActData, MemoryItem } from '@/types/api'
 import MarkdownIt from 'markdown-it'
 
 const md = new MarkdownIt({
@@ -275,9 +340,13 @@ import { useAuthStore } from '@/stores/auth'
 const router = useRouter()
 const authStore = useAuthStore()
 
-interface Message extends ChatMessage {
+interface Message {
+  role: string
+  content: string
   timestamp: string
   streaming?: boolean
+  memories?: MemoryItem[]
+  memoriesCollapsed?: boolean
   reactData?: ReActData
   reactCollapsed?: boolean
 }
@@ -342,10 +411,10 @@ const handleSendMessage = async () => {
     messages.value[msgIndex].reactCollapsed = false
   }
 
-  // 过滤掉内容为空的消息（避免发送占位符消息给后端）
-  const filteredMessages = messages.value
+  // 过滤掉内容为空的消息（避免发送占位符消息给后端），并传入时间戳
+  const filteredMessages: ChatMessage[] = messages.value
     .filter(m => m.content.trim() !== '')
-    .map(m => ({ role: m.role, content: m.content }))
+    .map(m => ({ role: m.role, content: m.content, timestamp: Date.now() }))
 
   const request: ChatRequest = {
     sessionId: sessionId.value,
@@ -361,6 +430,18 @@ const handleSendMessage = async () => {
           lastMsg.content += chunk
           lastMsg.streaming = true
           scrollToBottom()
+        }
+      },
+      (memories) => {
+        const lastMsg = messages.value[msgIndex]
+        if (lastMsg) {
+          // 后端返回的是 Tuple 格式 [timestamp, {role, content}]，转换为对象
+          lastMsg.memories = (memories || []).map((item: any) => ({
+            timestamp: item[0],
+            role: item[1]?.role || '',
+            content: item[1]?.content || ''
+          }))
+          lastMsg.memoriesCollapsed = true
         }
       },
       (error) => {
@@ -390,9 +471,23 @@ const handleSendMessage = async () => {
       request,
       (event) => {
         const lastMsg = messages.value[msgIndex]
-        if (!lastMsg || !lastMsg.reactData) return
+        if (!lastMsg) return
 
         const { type, data } = event
+
+        // memory 事件不依赖 reactData，需要优先处理
+        if (type === 'memory') {
+          const memories = (data || []).map((item: any) => ({
+            timestamp: item[0],
+            role: item[1]?.role || '',
+            content: item[1]?.content || ''
+          }))
+          lastMsg.memories = memories
+          lastMsg.memoriesCollapsed = true
+          return
+        }
+
+        if (!lastMsg.reactData) return
 
         // 缓存 step 事件，等收到非错误事件时再真正推入数组，避免推入又弹出导致页面抖动
         if (type === 'step') {
