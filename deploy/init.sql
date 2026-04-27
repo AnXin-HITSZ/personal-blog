@@ -2,8 +2,7 @@
 -- Personal Blog 数据库初始化脚本
 -- ============================================
 
-CREATE DATABASE personal_blog;
-
+-- 数据库已由 docker-compose 的 MYSQL_DATABASE 自动创建
 USE personal_blog;
 
 -- 创建用户表
