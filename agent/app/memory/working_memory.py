@@ -1,48 +1,65 @@
-import os.path
 import time
-from dataclasses import dataclass
-from typing import List, Dict, Any, Set, Tuple
+import json
+from typing import List, Dict, Tuple, Any
 import math
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import jieba
 import redis
+from dataclasses import dataclass, field
+from datetime import datetime
 
-from app.memory.memory_item import MemoryItem
-from app.memory.config import MemoryConfig
+from app.memory.utils.tokenizer import jieba_tokenizer, STOPWORDS
 
 
-def jieba_tokenizer(text):
+@dataclass
+class MemoryItem:
     """
-    自定义分词器: 使用 jieba 进行分词
+    单条记忆的数据结构
     """
-    return jieba.lcut(text)
+    id: str = field(default_factory=lambda: f"men_{int(time.time() * 1000000)}")
+    role: str = "user"
+    content: str = ""
+    importance: float = 0.5
+    timestamp: float = field(default_factory=time.time)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
-def load_stopwords() -> Set[str]:
+    def get_timestamp(self) -> datetime:
+        """
+        将时间戳转换为人类可读的日期时间格式
+        """
+        return datetime.fromtimestamp(self.timestamp)
+
+    def to_json(self) -> str:
+        """
+        序列化为完整的 JSON（存入 Redis Hash）
+        """
+        return json.dumps({
+            "id": self.id,
+            "role": self.role,
+            "content": self.content,
+            "importance": self.importance,
+            "timestamp": self.timestamp,
+            "metadata": self.metadata
+        }, ensure_ascii=False)
+
+    @classmethod
+    def from_json(cls, json_str: str) -> "MemoryItem":
+        """
+        从 Redis Hash 反序列化
+        """
+        data = json.loads(json_str)
+        return cls(**data)
+
+@dataclass
+class MemoryConfig:
     """
-    从 scripts/stopwords.txt 加载中文停用词表
+    工作记忆的配置类
     """
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-
-    app_dir = os.path.dirname(current_dir)
-
-    stopwords_path = os.path.join(app_dir, "scripts", "stopwords.txt")
-
-    stopwords = set()
-
-    try:
-        with open(stopwords_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#"):
-                    stopwords.add(line)
-        print(f"成功加载停用词表，共 {len(stopwords)} 个词")
-    except FileNotFoundError:
-        print(f"警告: 未找到停用词表文件 {stopwords_path}，将使用空停用词表")
-
-    return stopwords
-
-STOPWORDS = load_stopwords()
+    redis_url: str
+    memory_capacity: int = 50
+    ttl_seconds: int = 120
+    default_importance: float = 0.5
 
 class WorkingMemory:
     """
@@ -51,14 +68,13 @@ class WorkingMemory:
 
     def __init__(
             self,
-            redis_url: str,
             config: MemoryConfig
     ):
         """
         初始化工作记忆
         """
         self.config = config
-        self.redis = redis.from_url(redis_url, decode_responses=True)
+        self.redis = redis.from_url(self.config.redis_url, decode_responses=True)
         self.max_capacity = self.config.memory_capacity
         self.ttl_seconds = config.ttl_minutes
 

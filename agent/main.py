@@ -10,9 +10,12 @@ from starlette.responses import StreamingResponse
 from app.agents.react_agent import ReActAgent
 from app.agents.simple_agent import SimpleAgent
 from app.core.llm import AgentsLLM
-from app.memory.working_memory import MemoryConfig, MemoryItem
+from app.memory import WorkingMemory
+from app.memory import EpisodicMemory
 from app.tools.registry import ToolRegistry
 from app.memory.manager import UnifiedMemoryManager
+import app.memory.working_memory as working_memory
+import app.memory.episodic_memory as episodic_memory
 
 from app.tools.default_tools import CurrentTimeTool
 
@@ -32,10 +35,22 @@ tool_registry = ToolRegistry()
 tool_registry.register_tool(CurrentTimeTool())
 
 memory_manager = UnifiedMemoryManager(
-    redis_url=REDIS_URL,
-    default_memory_config=MemoryConfig(
+    working_memory_config=working_memory.MemoryConfig(
+        redis_url=REDIS_URL,
         memory_capacity=50,
-        ttl_minutes=120
+        ttl_seconds=120,
+        default_importance=0.5
+    ),
+    episodic_memory_config=episodic_memory.MemoryConfig(
+        database_path="./episodic_memory.db",
+        qdrant_url="http://localhost:6333",
+        qdrant_api_key="",
+        qdrant_collection_name="episodic_memory",
+        embedding_model_name="all-MiniLM-L6-v2",
+        memory_capacity=1000,
+        vector_weight=0.6,
+        keyword_weight=0.4,
+        time_decay_half_life_days=7.0
     )
 )
 
@@ -64,6 +79,9 @@ class ChatRequest(BaseModel):
         "populate_by_name": True
     }
 
+wm: WorkingMemory = memory_manager.memory_types["working_memory"]
+em: EpisodicMemory = memory_manager.memory_types["episodic_memory"]
+
 @app.post("/api/agent/chat/simple_agent/stream")
 async def simple_agent_chat_stream(request: ChatRequest):
     if not request.session_id or not request.messages:
@@ -72,9 +90,9 @@ async def simple_agent_chat_stream(request: ChatRequest):
     user_input = request.messages[-1].content
     session_id = request.session_id
 
-    history = memory_manager.get_history(session_id)
+    history = wm.get_all(session_id)
 
-    relevant_mem = memory_manager.retrieve(session_id, user_input, 5)
+    relevant_mem = wm.retrieve(session_id, user_input, 5)
 
     agent = SimpleAgent(
         LLM_MODEL_ID,
@@ -90,10 +108,8 @@ async def simple_agent_chat_stream(request: ChatRequest):
             full_resp += chunk
             yield f"data: {json.dumps({'content': chunk}, ensure_ascii=False)}\n\n"
 
-        memory_manager.add_message(session_id, "user", user_input, 0.8)
-        print(full_resp
-              )
-        memory_manager.add_message(session_id, "assistant", full_resp, 0.7)
+        wm.add_message(session_id, "user", user_input, 0.8)
+        wm.add_message(session_id, "assistant", full_resp, 0.7)
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
@@ -106,9 +122,9 @@ async def react_agent_chat_stream(request: ChatRequest):
     user_input = request.messages[-1].content
     session_id = request.session_id
 
-    history = memory_manager.get_history(session_id)
+    history = wm.get_all(session_id)
 
-    relevant_mem = memory_manager.retrieve(session_id, user_input, 5)
+    relevant_mem = wm.retrieve(session_id, user_input, 5)
 
     agent = ReActAgent(
         LLM_MODEL_ID,
@@ -132,8 +148,8 @@ async def react_agent_chat_stream(request: ChatRequest):
                 final_resp = event_data
 
         if final_resp:
-            memory_manager.add_message(session_id, "user", user_input, 0.8)
-            memory_manager.add_message(session_id, "assistant", final_resp, 0.7)
+            wm.add_message(session_id, "user", user_input, 0.8)
+            wm.add_message(session_id, "assistant", final_resp, 0.7)
 
         yield "data: [DONE]\n\n"
 
