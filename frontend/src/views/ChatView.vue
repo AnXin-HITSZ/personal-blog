@@ -435,9 +435,9 @@ const handleSendMessage = async () => {
       (memories) => {
         const lastMsg = messages.value[msgIndex]
         if (lastMsg) {
-          // 后端返回的是 Tuple 格式 [timestamp, {role, content}]，转换为对象
+          // 后端返回的是 Tuple 格式 [score, {role, content, time}]，转换为对象
           lastMsg.memories = (memories || []).map((item: any) => ({
-            timestamp: item[0],
+            timestamp: item[1]?.time || '',
             role: item[1]?.role || '',
             content: item[1]?.content || ''
           }))
@@ -478,7 +478,7 @@ const handleSendMessage = async () => {
         // memory 事件不依赖 reactData，需要优先处理
         if (type === 'memory') {
           const memories = (data || []).map((item: any) => ({
-            timestamp: item[0],
+            timestamp: item[1]?.time || '',
             role: item[1]?.role || '',
             content: item[1]?.content || ''
           }))

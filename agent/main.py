@@ -10,8 +10,7 @@ from starlette.responses import StreamingResponse
 from app.agents.react_agent import ReActAgent
 from app.agents.simple_agent import SimpleAgent
 from app.core.llm import AgentsLLM
-from app.memory import WorkingMemory
-from app.memory import EpisodicMemory
+from app.memory.memory_tool import MemoryTool
 from app.tools.registry import ToolRegistry
 from app.memory.manager import UnifiedMemoryManager
 import app.memory.working_memory as working_memory
@@ -79,8 +78,9 @@ class ChatRequest(BaseModel):
         "populate_by_name": True
     }
 
-wm: WorkingMemory = memory_manager.memory_types["working_memory"]
-em: EpisodicMemory = memory_manager.memory_types["episodic_memory"]
+memory_tool = MemoryTool(
+    memory_manager=memory_manager
+)
 
 @app.post("/api/agent/chat/simple_agent/stream")
 async def simple_agent_chat_stream(request: ChatRequest):
@@ -90,9 +90,11 @@ async def simple_agent_chat_stream(request: ChatRequest):
     user_input = request.messages[-1].content
     session_id = request.session_id
 
-    history = wm.get_all(session_id)
-
-    relevant_mem = wm.retrieve(session_id, user_input, 5)
+    relevant_mem = memory_tool.search(
+        query=user_input,
+        limit=10,
+        session_id=session_id
+    )
 
     agent = SimpleAgent(
         LLM_MODEL_ID,
@@ -108,8 +110,10 @@ async def simple_agent_chat_stream(request: ChatRequest):
             full_resp += chunk
             yield f"data: {json.dumps({'content': chunk}, ensure_ascii=False)}\n\n"
 
-        wm.add_message(session_id, "user", user_input, 0.8)
-        wm.add_message(session_id, "assistant", full_resp, 0.7)
+        # wm.add_message(session_id, "user", user_input, 0.8)
+        # wm.add_message(session_id, "assistant", full_resp, 0.7)
+        memory_tool.add_memory(session_id, "user", user_input, 0.8)
+        memory_tool.add_memory(session_id, "assistant", full_resp, 0.7)
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
@@ -122,9 +126,11 @@ async def react_agent_chat_stream(request: ChatRequest):
     user_input = request.messages[-1].content
     session_id = request.session_id
 
-    history = wm.get_all(session_id)
-
-    relevant_mem = wm.retrieve(session_id, user_input, 5)
+    relevant_mem = memory_tool.search(
+        query=user_input,
+        limit=10,
+        session_id=session_id
+    )
 
     agent = ReActAgent(
         LLM_MODEL_ID,
@@ -148,8 +154,10 @@ async def react_agent_chat_stream(request: ChatRequest):
                 final_resp = event_data
 
         if final_resp:
-            wm.add_message(session_id, "user", user_input, 0.8)
-            wm.add_message(session_id, "assistant", final_resp, 0.7)
+            # wm.add_message(session_id, "user", user_input, 0.8)
+            # wm.add_message(session_id, "assistant", final_resp, 0.7)
+            memory_tool.add_memory(session_id, "user", user_input, 0.8)
+            memory_tool.add_memory(session_id, "assistant", final_resp, 0.7)
 
         yield "data: [DONE]\n\n"
 

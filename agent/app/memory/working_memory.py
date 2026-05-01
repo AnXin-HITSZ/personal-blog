@@ -76,7 +76,7 @@ class WorkingMemory:
         self.config = config
         self.redis = redis.from_url(self.config.redis_url, decode_responses=True)
         self.max_capacity = self.config.memory_capacity
-        self.ttl_seconds = config.ttl_minutes
+        self.ttl_seconds = config.ttl_seconds
 
     def _key_meta(self, session_id: str) -> str:
         """
@@ -195,7 +195,7 @@ class WorkingMemory:
 
         return max(decay, 0.01)
 
-    def retrieve(self, session_id: str, query: str, limit: int = 5) -> List[Tuple[int, Dict[str, str]]]:
+    def retrieve(self, session_id: str, query: str, limit: int = 5) -> List[Tuple[float, Dict[str, str]]]:
         """
         混合检索: TF-IDF 向量化 + 关键词匹配
         """
@@ -203,7 +203,7 @@ class WorkingMemory:
 
         if not all_memories:
             return [(
-                0,
+                0.0,
                 {
                     "role": "error",
                     "content": "暂无相关对话记忆"
@@ -232,21 +232,16 @@ class WorkingMemory:
 
         scored_memories.sort(key=lambda x: x[0], reverse=True)
 
-        relevant = [memory for _, memory in scored_memories[:limit]]
-
-        # result = "以下是相关的对话历史：\n"
-        # for mem in relevant:
-        #     dt = mem.get_timestamp_datetime().strftime("%H:%M")
-        #     result += f"- [{dt}] {mem.role}: {mem.content}\n"
+        relevant_with_scores = scored_memories[:limit]
 
         result = []
-        for mem in relevant:
-            dt = mem.get_timestamp().strftime("%H:%M")
+        for score, mem in relevant_with_scores:
             result.append((
-                dt,
+                score,
                 {
                     "role": mem.role,
-                    "content": mem.content
+                    "content": mem.content,
+                    "time": mem.get_timestamp().strftime("%H:%M")
                 }
             ))
 
@@ -295,7 +290,7 @@ class WorkingMemory:
 
     def _calculate_keyword_score(self, query: str, content: str) -> float:
         """
-        计算关键词匹配分数: 使用 jieba 分词 + 词交集匹配
+        计算关键词匹配分数: 匹配词数 / 总查询词数，反映查询词在记忆中的覆盖率
         """
         if not query or not content:
             return 0.0
@@ -304,9 +299,6 @@ class WorkingMemory:
         content_words = jieba.lcut(content.lower())
 
         def is_valid_word(w: str) -> bool:
-            """
-            过滤停用词和过短的词
-            """
             return len(w) >= 1 and w not in STOPWORDS and w.strip() != ""
 
         query_words_filtered = [w for w in query_words if is_valid_word(w)]
@@ -315,23 +307,11 @@ class WorkingMemory:
         if not query_words_filtered:
             return 0.0
 
-        score = 0.0
-        matched_words = []
-
-        for word in query_words_filtered:
-            if word in content_words_set:
-                matched_words.append(word)
-                weight = 0.2 + (len(word) * 0.1)
-                score += weight
-
-        query_lower = query.lower()
-        content_lower = content.lower()
-        if any(kw in content_lower for kw in query_words_filtered if len(kw) >= 2):
-            score += 0.3
-
-        final_score = min(score, 1.0)
+        matched_words = [w for w in query_words_filtered if w in content_words_set]
+        matched_count = len(matched_words)
+        score = matched_count / len(query_words_filtered)
 
         if matched_words:
-            print(f"[匹配] 查询: {query} | 记忆: {content} |匹配词: {matched_words} | 分数: {final_score:.2f}")
+            print(f"[WM-匹配] 查询: {query} | 记忆: {content[:40]}... | 匹配词: {matched_words} | 分数: {score:.2f}")
 
-        return final_score
+        return score

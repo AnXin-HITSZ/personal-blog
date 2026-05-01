@@ -18,7 +18,7 @@ class ReActAgent(Agent):
             llm: AgentsLLM,
             tool_registry: ToolRegistry,
             max_steps: int,
-            memory_context: List[Tuple[int, Dict[str, str]]]
+            memory_context: List[Tuple[float, Dict[str, str]]]
     ):
         super().__init__(name, llm, tool_registry)
         self.input_text = None
@@ -203,11 +203,11 @@ class ReActAgent(Agent):
 
         str_memory_content = ""
         for mem in self.memory_context:
-            timestamp, msg = mem
+            _, msg = mem
             if msg["role"] == "error":
                 str_memory_content = msg["content"]
                 break
-            str_memory_content += f"- [{timestamp}] {msg['role']}: {msg['content']}"
+            str_memory_content += f"- [{msg['time']}] {msg['role']}: {msg['content']}\n"
 
         if self.memory_context:
             if not tools_description or tools_description == "暂无可用工具":

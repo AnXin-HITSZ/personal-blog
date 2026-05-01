@@ -2,6 +2,8 @@ import json
 import time
 import math
 import sqlite3
+import os
+import uuid
 
 import jieba
 import numpy as np
@@ -22,7 +24,7 @@ class MemoryItem:
     """
     统一的记忆数据结构
     """
-    id: str = field(default_factory=lambda: f"epi_{int(time.time() * 1000000)}")
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     role: str = "user"
     content: str = ""
     importance: float = 0.5
@@ -104,13 +106,14 @@ class SQLiteDocumentStore:
             CREATE TABLE IF NOT EXISTS memories(
                 id TEXT PRIMARY KEY,            -- 记忆唯一 ID
                 role TEXT NOT NULL,             -- 角色(user / assistant)
+                content TEXT NOT NULL DEFAULT '', -- 记忆内容
                 importance REAL DEFAULT 0.5,    -- 重要性(0.0 - 1.0)
                 timestamp REAL NOT NULL,        -- 时间戳
                 metadata TEXT NOT NULL          -- 元数据(JSON 字符串)
             )
         ''')
 
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_timestamp ON memory(timestamp)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_timestamp ON memories(timestamp)')
 
         self._conn.commit()
         print("[SQLite] 数据库初始化完成")
@@ -191,8 +194,51 @@ class LocalEmbeddingModel:
         self.vector_size = 384
 
         try:
-            print(f"[Embedding] 正在加载模型: {model_name} ...")
-            self.model = SentenceTransformer(model_name)
+            if not os.environ.get("HF_ENDPOINT"):
+                os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+
+            repo_id = f"sentence-transformers/{model_name}" if "/" not in model_name else model_name
+
+            model_path = None
+            from huggingface_hub import snapshot_download
+            import time as _time
+
+            try:
+                cached_path = snapshot_download(repo_id, local_files_only=True)
+                # 验证缓存是否完整（检查模型权重文件）
+                has_weights = any(
+                    os.path.isfile(os.path.join(cached_path, f))
+                    for f in os.listdir(cached_path)
+                    if f.endswith((".safetensors", ".bin"))
+                )
+                if has_weights:
+                    print(f"[Embedding] 从缓存加载模型: {model_name}")
+                    model_path = cached_path
+                else:
+                    print(f"[Embedding] 缓存不完整，清理并重新下载...")
+                    import shutil
+                    shutil.rmtree(cached_path)
+            except Exception:
+                pass
+
+            if model_path is None:
+                try:
+                    from modelscope.hub.snapshot_download import snapshot_download as ms_download
+                    print(f"[Embedding] 首次加载模型: {model_name} (~80MB)")
+                    print(f"[Embedding] 正在从 ModelScope 下载...")
+                    _start = _time.time()
+                    model_path = ms_download(repo_id)
+                    _elapsed = _time.time() - _start
+                    print(f"[Embedding] 下载完成，耗时 {_elapsed:.1f} 秒")
+                except ImportError:
+                    print(f"[Embedding] 首次加载模型: {model_name} (~80MB)")
+                    print(f"[Embedding] 正在从 {os.environ['HF_ENDPOINT']} 下载...")
+                    _start = _time.time()
+                    model_path = snapshot_download(repo_id, local_files_only=False)
+                    _elapsed = _time.time() - _start
+                    print(f"[Embedding] 下载完成，耗时 {_elapsed:.1f} 秒")
+
+            self.model = SentenceTransformer(model_path)
             self.vector_size = self.model.get_embedding_dimension()
             print(f"[Embedding] 模型加载成功！向量维度: {self.vector_size}")
         except Exception as e:
@@ -257,7 +303,7 @@ class QdrantVectorStore:
         添加一条向量及其元数据
         """
         point = PointStruct(
-            id=vector_id,
+            id=uuid.UUID(vector_id),
             vector=vector,
             payload=payload
         )
@@ -291,12 +337,12 @@ class QdrantVectorStore:
         hits = self.client.query_points(
             collection_name=self.collection_name,
             query=query_vector,
-            filter=qdrant_filter,
+            query_filter=qdrant_filter,
             limit=limit
         )
 
         results = []
-        for hit in hits:
+        for hit in hits.points:
             results.append({
                 "id": hit.id,
                 "score": hit.score,
@@ -310,7 +356,7 @@ class QdrantVectorStore:
         """
         self.client.delete(
             collection_name=self.collection_name,
-            points_selector=[vector_id]
+            points_selector=[uuid.UUID(vector_id)]
         )
 
 class EpisodicMemory:
@@ -411,6 +457,7 @@ class EpisodicMemory:
         """
         if len(memories) < 2:
             return {}
+
         session_id = memories[0].metadata.get("session_id", "default")
         cache_key = session_id
 
@@ -420,24 +467,24 @@ class EpisodicMemory:
         else:
             contents = [m.content for m in memories]
             vectorizer = TfidfVectorizer(
-                tokenizer=jieba.tokenize,
+                tokenizer=jieba.lcut,
                 token_pattern=None,
                 stop_words=list(STOPWORDS)
             )
-            tf_max = vectorizer.fit_transform(contents)
+            tf_mat = vectorizer.fit_transform(contents)
             self._tfidf_cache[cache_key] = {
                 "vec": vectorizer,
-                "mat": tf_max,
+                "mat": tf_mat,
                 "cnt": len(memories)
             }
 
-            q_vec = vectorizer.transform([query])
-            sims = cosine_similarity(q_vec, tf_max)[0]
-            return {memories[i].id: float(sims[i]) for i in range(len(memories))}
+        q_vec = vectorizer.transform([query])
+        sims = cosine_similarity(q_vec, tf_mat)[0]
+        return {memories[i].id: float(sims[i]) for i in range(len(memories))}
 
     def _calculate_keyword_score(self, query: str, content: str) -> float:
         """
-        计算关键词匹配分数: 使用 jieba 分词 + 词交集匹配
+        计算关键词匹配分数: 匹配词数 / 总查询词数，反映查询词在记忆中的覆盖率
         """
         if not query or not content:
             return 0.0
@@ -446,9 +493,6 @@ class EpisodicMemory:
         content_words = jieba.lcut(content.lower())
 
         def is_valid_word(w: str) -> bool:
-            """
-            过滤停用词和过短的词
-            """
             return len(w) >= 1 and w not in STOPWORDS and w.strip() != ""
 
         query_words_filtered = [w for w in query_words if is_valid_word(w)]
@@ -457,26 +501,14 @@ class EpisodicMemory:
         if not query_words_filtered:
             return 0.0
 
-        score = 0.0
-        matched_words = []
-
-        for word in query_words_filtered:
-            if word in content_words_set:
-                matched_words.append(word)
-                weight = 0.2 + (len(word) * 0.1)
-                score += weight
-
-        query_lower = query.lower()
-        content_lower = content.lower()
-        if any(kw in content_lower for kw in query_words_filtered if len(kw) >= 2):
-            score += 0.3
-
-        final_score = min(score, 1.0)
+        matched_words = [w for w in query_words_filtered if w in content_words_set]
+        matched_count = len(matched_words)
+        score = matched_count / len(query_words_filtered)
 
         if matched_words:
-            print(f"[匹配] 查询: {query} | 记忆: {content} |匹配词: {matched_words} | 分数: {final_score:.2f}")
+            print(f"[匹配] 查询: {query} | 记忆: {content[:40]}... | 匹配词: {matched_words} | 分数: {score:.2f}")
 
-        return final_score
+        return score
 
     def _calc_time_decay(self, ts: float, half_life_days: float) -> float:
         """

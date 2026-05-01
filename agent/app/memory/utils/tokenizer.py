@@ -14,7 +14,7 @@ def load_stopwords() -> Set[str]:
     """
     current_dir = os.path.dirname(os.path.abspath(__file__))
 
-    app_dir = os.path.dirname(current_dir)
+    app_dir = os.path.dirname(os.path.dirname(current_dir))
 
     stopwords_path = os.path.join(app_dir, "scripts", "stopwords.txt")
 
