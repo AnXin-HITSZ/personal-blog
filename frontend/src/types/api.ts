@@ -19,6 +19,21 @@ export interface RegisterDTO {
 export interface UserInfo {
   userId: number
   username: string
+  isAdmin: number
+}
+
+export interface RAGKnowledgeBase {
+  ragId?: number
+  userId?: number
+  name: string
+  description?: string
+  namespace: string
+  collectionName?: string
+  filePath?: string
+  fileCount?: number
+  status?: number
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface Article {
@@ -39,6 +54,7 @@ export interface ChatMessage {
 export interface ChatRequest {
   sessionId: string
   messages: ChatMessage[]
+  userId?: number
 }
 
 export interface ChatResponse {
@@ -66,4 +82,13 @@ export interface MemoryItem {
 export interface ReActData {
   steps: ReActStep[]
   finalAnswer: string
+}
+
+export interface SessionDTO {
+  sessionId: string
+  title: string
+  preview?: string
+  createdAt: number
+  updatedAt: number
+  messageCount: number
 }

@@ -34,11 +34,8 @@ public class AgentController {
      */
     @PostMapping(value = "/chat/simple_agent/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter chatSimpleAgentStream(
-            @RequestBody ChatRequest request,
-            Authentication authentication
+            @RequestBody ChatRequest request
     ) {
-        UserDetailsImpl loginUser = (UserDetailsImpl) authentication.getPrincipal();
-        request.setSessionId(loginUser.getUser().getUserId().toString());
         return agentService.chatSimpleAgentStream(request);
     }
 
@@ -47,11 +44,8 @@ public class AgentController {
      */
     @PostMapping(value = "/chat/react_agent/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter chatReActAgentStream(
-            @RequestBody ChatRequest request,
-            Authentication authentication
+            @RequestBody ChatRequest request
     ) {
-        UserDetailsImpl loginUser = (UserDetailsImpl) authentication.getPrincipal();
-        request.setSessionId(loginUser.getUser().getUserId().toString());
         return agentService.chatReActAgentStream(request);
     }
 }

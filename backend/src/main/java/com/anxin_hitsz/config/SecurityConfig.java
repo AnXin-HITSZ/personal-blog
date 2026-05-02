@@ -78,6 +78,7 @@ public class SecurityConfig {
                         .requestMatchers("/user/account/register", "/user/account/login").permitAll()
                         .requestMatchers("/api/article/**").permitAll()
                         .requestMatchers("/api/agent/**").permitAll()
+                        .requestMatchers("/api/rag/**").permitAll()
                         // 其他请求需要认证
                         .anyRequest().authenticated()
                 )

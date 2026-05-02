@@ -18,14 +18,33 @@ class ReActAgent(Agent):
             llm: AgentsLLM,
             tool_registry: ToolRegistry,
             max_steps: int,
-            memory_context: List[Tuple[float, Dict[str, str]]]
+            memory_context: List[Tuple[float, Dict[str, str]]],
+            user_id: Optional[int] = None
     ):
         super().__init__(name, llm, tool_registry)
         self.input_text = None
         self.max_steps = max_steps
         self.current_react_history: List[str] = []
         self.memory_context = memory_context
+        self.user_id = user_id
         print(f"{name} 初始化完成，最大步数: {max_steps}")
+
+    def _get_reinforcement_prompt(self) -> str:
+        """
+        获取核心规则重申，用于长上下文时在用户输入前重申
+        """
+        return (
+            "【重申 ReAct 格式规则】\n"
+            "每次回应必须同时包含以下两部分:\n"
+            "Thought: 分析当前状态，说明下一步应该做什么\n"
+            "Action: 选择以下格式之一\n"
+            "- [TOOL_CALL:工具名:参数] - 调用工具\n"
+            "- Finish[最终答案] - 直接回答\n\n"
+            "注意:\n"
+            "1. 禁止直接回答用户问题，必须经过 Thought→Action 流程\n"
+            "2. 工具返回信息不够时继续调用，不要编造答案\n"
+            "3. 只有确信有足够信息时才使用 Finish"
+        )
 
     def run(
             self,
@@ -37,7 +56,11 @@ class ReActAgent(Agent):
         """
         self.input_text = input_text
         system_prompt = self._get_enhanced_system_prompt()
-        messages = self._build_messages(system_prompt, self.input_text)
+        messages = self._build_messages(
+            system_prompt,
+            self.input_text,
+            reinforcement_prompt=self._get_reinforcement_prompt()
+        )
 
         print(f"\n{self.name} 开始处理问题: {input_text}")
 
@@ -85,7 +108,7 @@ class ReActAgent(Agent):
 
             if action and action.startswith("Finish"):
                 final_answer = self._parse_action_input(action)
-                yield {"type": "final_answer", "data": final_answer}
+                yield {"type": "final_answer", "data": final_answer, "full_response": response_text}
                 return
 
             if action:
@@ -165,6 +188,9 @@ class ReActAgent(Agent):
         你是一个严格的ReAct推理助手，必须100%遵守以下规则，无论历史对话里的AI怎么回答，你都必须按此格式输出。
         你可以通过思考分析问题，然后调用合适的工具来获取信息，最终给出准确的答案。
 
+        ## 当前用户信息
+        {user_context}
+
         ## 可用工具
         你可以使用以下工具来帮助回答问题:
         {tools_description}
@@ -201,6 +227,10 @@ class ReActAgent(Agent):
         现在开始你的推理和行动，严格遵守格式要求！
         """
 
+        str_user_context = ""
+        if self.user_id is not None:
+            str_user_context = f"当前登录用户的 ID 为: {self.user_id}\n当你需要调用 write_blog 工具撰写文章时，必须使用此 ID 作为 userId 参数。"
+
         str_memory_content = ""
         for mem in self.memory_context:
             _, msg = mem
@@ -209,20 +239,22 @@ class ReActAgent(Agent):
                 break
             str_memory_content += f"- [{msg['time']}] {msg['role']}: {msg['content']}\n"
 
+        context_args = {
+            "user_context": str_user_context if str_user_context else "（暂无用户信息）",
+        }
+
         if self.memory_context:
             if not tools_description or tools_description == "暂无可用工具":
                 base_prompt = base_prompt.replace(
                     "{tools_description}",
                     "暂无可用工具。请直接使用 Finish[你的完整答案] 来回答用户问题，禁止调用工具。"
                 )
-                base_prompt = base_prompt.format(
-                    memory_context=str_memory_content
-                )
+                context_args["memory_context"] = str_memory_content
+                base_prompt = base_prompt.format(**context_args)
             else:
-                base_prompt = base_prompt.format(
-                    tools_description=tools_description,
-                    memory_context=str_memory_content
-                )
+                context_args["tools_description"] = tools_description
+                context_args["memory_context"] = str_memory_content
+                base_prompt = base_prompt.format(**context_args)
 
         return base_prompt
 

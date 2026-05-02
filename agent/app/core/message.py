@@ -1,7 +1,6 @@
 from typing import Optional, Dict, Any, Literal
 from datetime import datetime
-from pydantic import BaseModel
-
+from pydantic import BaseModel, Field
 
 MessageRole = Literal["user", "assistant", "system", "tool"]
 
@@ -12,7 +11,7 @@ class Message(BaseModel):
 
     content: str
     role: MessageRole
-    timestamp: datetime
+    timestamp: datetime = Field(default_factory=datetime.now)
     metadata: Optional[Dict[str, Any]] = None
 
     def __init__(self, content: str, role: MessageRole):

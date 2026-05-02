@@ -33,6 +33,7 @@ public class InfoServiceImpl implements IInfoService {
         UserInfoVO userInfoVO = new UserInfoVO();
         userInfoVO.setUserId(user.getUserId());
         userInfoVO.setUsername(user.getUsername());
+        userInfoVO.setIsAdmin(user.getIsAdmin());
         return Result.ok(userInfoVO);
     }
 }

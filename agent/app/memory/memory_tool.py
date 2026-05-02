@@ -94,6 +94,16 @@ class MemoryTool:
 
         scored.sort(key=lambda x: x[0], reverse=True)
 
+        # 去重: 相同 (role, content) 只保留评分最高的
+        seen = set()
+        deduped = []
+        for score, item_dict in scored:
+            key = (item_dict.get("role", ""), item_dict.get("content", ""))
+            if key not in seen:
+                seen.add(key)
+                deduped.append((score, item_dict))
+        scored = deduped
+
         result = []
         for score, item_dict in scored[:limit]:
             int_score = min(100, max(1, int(score * 100)))

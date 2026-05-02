@@ -28,6 +28,16 @@ class SimpleAgent(Agent):
         )
         self.memory_context = memory_context
 
+    def _get_reinforcement_prompt(self) -> str:
+        """获取核心规则重申，用于长上下文时在用户输入前重申"""
+        return (
+            "【重申核心规则】\n"
+            "- 工具调用格式: [TOOL_CALL:工具名:参数]\n"
+            "- 如果参数是简单字符串可直接填值，如 [TOOL_CALL:search:Python]\n"
+            "- 工具调用结果会自动插入到对话中，请基于结果继续回答\n"
+            "- 如果已有足够信息，直接给出完整回答"
+        )
+
     def run(
             self,
             input_text: str,
@@ -38,7 +48,11 @@ class SimpleAgent(Agent):
         运行 SimpleAgent
         """
         enhanced_system_prompt = self._get_enhanced_system_prompt()
-        messages = self._build_messages(enhanced_system_prompt, input_text)
+        messages = self._build_messages(
+            enhanced_system_prompt,
+            input_text,
+            reinforcement_prompt=self._get_reinforcement_prompt()
+        )
 
         final_messages = self._execute_tool_loop(messages, max_tool_iterations)
 

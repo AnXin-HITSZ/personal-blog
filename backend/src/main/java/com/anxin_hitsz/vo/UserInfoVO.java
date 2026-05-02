@@ -27,4 +27,8 @@ public class UserInfoVO {
      */
     private String username;
 
+    /**
+     * 是否为管理员
+     */
+    private Integer isAdmin;
 }

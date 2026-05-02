@@ -30,6 +30,8 @@ class Agent(ABC):
         """
         pass
 
+    _REINFORCEMENT_THRESHOLD = 10
+
     @abstractmethod
     def run(
             self,
@@ -41,27 +43,24 @@ class Agent(ABC):
         """
         pass
 
-    def _build_messages(self, enhanced_system_prompt: str, input_text: str) -> List[Dict[str, str]]:
+    def _build_messages(
+            self,
+            enhanced_system_prompt: str,
+            input_text: str,
+            reinforcement_prompt: str = ""
+    ) -> List[Dict[str, str]]:
         """
-        构建消息列表
+        构建消息列表（当历史轮次超过阈值时，在用户输入前注入规则重申，缓解模型在长上下文中遗忘系统指令的问题）
         """
-        messages = []
-
-        messages.append({
-            "role": "system",
-            "content": enhanced_system_prompt
-        })
+        messages = [{"role": "system", "content": enhanced_system_prompt}]
 
         for msg in self._history:
-            messages.append({
-                "role": msg.role,
-                "content": msg.content
-            })
+            messages.append({"role": msg.role, "content": msg.content})
 
-        messages.append({
-            "role": "user",
-            "content": input_text
-        })
+        if reinforcement_prompt and len(self._history) >= self._REINFORCEMENT_THRESHOLD:
+            messages.append({"role": "system", "content": reinforcement_prompt})
+
+        messages.append({"role": "user", "content": input_text})
 
         return messages
 

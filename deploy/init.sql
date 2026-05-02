@@ -46,3 +46,18 @@ CREATE TABLE IF NOT EXISTS tb_article (
     -- 更新日期：自动更新为当前时间
                                           update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新日期'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统文章表';
+
+-- 创建 RAG 知识库表
+CREATE TABLE IF NOT EXISTS tb_rag (
+    rag_id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '知识库ID',
+    user_id BIGINT NOT NULL COMMENT '创建者ID（关联 tb_user.user_id）',
+    name VARCHAR(100) NOT NULL COMMENT '知识库名称',
+    description VARCHAR(500) DEFAULT '' COMMENT '知识库描述',
+    namespace VARCHAR(100) NOT NULL UNIQUE COMMENT '命名空间（唯一标识）',
+    collection_name VARCHAR(100) NOT NULL DEFAULT 'rag_knowledge_base' COMMENT 'Qdrant集合名',
+    file_path VARCHAR(500) DEFAULT '' COMMENT '知识库文件路径',
+    file_count INT DEFAULT 0 COMMENT '文件数量',
+    status TINYINT NOT NULL DEFAULT 0 COMMENT '状态：0-未索引，1-已索引，2-索引中',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='RAG知识库表';

@@ -27,7 +27,16 @@ class ToolRegistry:
         description = []
 
         for tool in self._tools.values():
-            description.append(f"- {tool.name}: {tool.description}")
+            params = tool.get_parameters()
+            if params:
+                param_lines = []
+                for p in params:
+                    opt = " (可选)" if not p.required else ""
+                    param_lines.append(f"      {p.name} ({p.type}){opt}: {p.description}")
+                param_str = "\n" + "\n".join(param_lines)
+            else:
+                param_str = " (无参数)"
+            description.append(f"- {tool.name}: {tool.description}{param_str}")
 
         return "\n".join(description) if description else "暂无可用工具"
 
