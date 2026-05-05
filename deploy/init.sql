@@ -61,3 +61,32 @@ CREATE TABLE IF NOT EXISTS tb_rag (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='RAG知识库表';
+
+-- 创建计划表
+CREATE TABLE IF NOT EXISTS tb_plan (
+    plan_id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '计划ID',
+    user_id BIGINT NOT NULL COMMENT '用户ID（关联 tb_user.user_id）',
+    session_id VARCHAR(64) NOT NULL COMMENT '会话ID',
+    main_goal VARCHAR(1024) NOT NULL COMMENT '计划主要目标',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    INDEX idx_session (session_id),
+    INDEX idx_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='任务计划表';
+
+-- 创建计划任务表
+CREATE TABLE IF NOT EXISTS tb_plan_task (
+    task_id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '任务ID',
+    plan_id BIGINT NOT NULL COMMENT '所属计划ID（关联 tb_plan.plan_id，级联删除）',
+    parent_task_id BIGINT NULL COMMENT '父任务ID（关联 tb_plan_task.task_id，级联删除）',
+    task_path VARCHAR(32) NOT NULL COMMENT '任务路径：如 0、0.1、0.1.2',
+    task_goal VARCHAR(2048) NOT NULL COMMENT '任务目标描述',
+    task_state VARCHAR(32) NOT NULL DEFAULT 'open' COMMENT '任务状态：open/in_progress/completed/verified/abandoned',
+    display_order INT DEFAULT 0 COMMENT '显示顺序',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    FOREIGN KEY (plan_id) REFERENCES tb_plan(plan_id) ON DELETE CASCADE,
+    FOREIGN KEY (parent_task_id) REFERENCES tb_plan_task(task_id) ON DELETE CASCADE,
+    INDEX idx_plan (plan_id),
+    INDEX idx_parent (parent_task_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='计划任务表';

@@ -30,4 +30,9 @@ public class ChatRequest {
      */
     private Boolean stream = true;
 
+    /**
+     * 用户 ID
+     */
+    private Long userId;
+
 }

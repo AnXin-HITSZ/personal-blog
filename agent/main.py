@@ -6,8 +6,7 @@ import urllib.request
 import urllib.error
 from contextlib import asynccontextmanager
 from typing import List, Optional
-from pydantic import BaseModel
-from pydantic.alias_generators import to_camel
+from pydantic import BaseModel, Field
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import StreamingResponse
@@ -25,6 +24,8 @@ import app.memory.episodic_memory as episodic_memory
 
 from app.tools.default_tools import CurrentTimeTool, WriteBlogTool
 from app.tools.default_tools.rag_tool import RAGTool
+from app.plan.manager import PlanManager
+from app.plan.tools import CreatePlanTool, AddSubtaskTool, ModifyTaskTool
 
 
 LLM_MODEL_ID = os.getenv('LLM_MODEL_ID')
@@ -51,7 +52,7 @@ rag_tool = RAGTool(
     rag_namespace="default"
 )
 tool_registry.register_tool(rag_tool)
-tool_registry.register_tool(WriteBlogTool())
+tool_registry.register_tool(WriteBlogTool(agents_llm=llm))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -132,13 +133,12 @@ class ChatMessage(BaseModel):
     timestamp: int
 
 class ChatRequest(BaseModel):
-    session_id: str
+    session_id: str = Field(alias="sessionId")
     messages: List[ChatMessage]
     stream: Optional[bool] = True
-    user_id: Optional[int] = None
+    user_id: Optional[int] = Field(None, alias="userId")
 
     model_config = {
-        "alias_generator": to_camel,
         "populate_by_name": True
     }
 
@@ -263,13 +263,31 @@ async def react_agent_chat_stream(request: ChatRequest):
 
     history_messages = RedisChatService.get_chat_history(session_id)
 
+    # 创建 PlanManager 并尝试加载已有计划
+    if request.user_id is None:
+        print(f"[Plan] ⚠️ request.user_id 为 None，用户可能未登录或 userInfo 未加载")
+    else:
+        print(f"[Plan] request.user_id = {request.user_id}")
+    plan_manager = PlanManager(session_id=session_id, user_id=request.user_id)
+    plan_manager.load_from_backend()
+
+    # 注册计划工具（每个请求重新注册，确保使用当前 PlanManager）
+    plan_tools = [
+        CreatePlanTool(plan_manager),
+        AddSubtaskTool(plan_manager),
+        ModifyTaskTool(plan_manager),
+    ]
+    for pt in plan_tools:
+        tool_registry.register_tool(pt)
+
     agent = ReActAgent(
         LLM_MODEL_ID,
         llm,
         tool_registry,
-        5,
+        100,
         relevant_mem,
-        user_id=request.user_id
+        user_id=request.user_id,
+        plan_manager=plan_manager,
     )
     for msg in history_messages:
         agent.add_message(Message(content=msg["content"], role=msg["role"]))

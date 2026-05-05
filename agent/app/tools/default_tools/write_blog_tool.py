@@ -1,7 +1,7 @@
 import json
 import urllib.request
 import os
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from app.tools.base import Tool, ToolParameter
 
@@ -14,11 +14,12 @@ class WriteBlogTool(Tool):
     撰写博客文章工具：调用 SpringBoot 后端新增文章接口
     """
 
-    def __init__(self):
+    def __init__(self, agents_llm: Optional[object] = None):
         super().__init__(
             name="write_blog",
-            description="根据用户意图撰写一篇博客文章，调用后端接口创建文章并持久化到数据库"
+            description="撰写一篇博客文章并保存到数据库。如果只提供标题不提供内容，工具会自动生成完整文章。"
         )
+        self._llm = agents_llm
 
     def get_parameters(self) -> List[ToolParameter]:
         return [
@@ -31,8 +32,8 @@ class WriteBlogTool(Tool):
             ToolParameter(
                 name="content",
                 type="string",
-                description="博客文章正文内容（支持 Markdown 格式）",
-                required=True,
+                description="博客文章正文内容（支持 Markdown 格式）。如果不提供，将由 AI 自动生成。",
+                required=False,
             ),
             ToolParameter(
                 name="userId",
@@ -42,6 +43,29 @@ class WriteBlogTool(Tool):
             ),
         ]
 
+    def _generate_content(self, title: str, user_id: int) -> str:
+        """使用 LLM 自动生成博客文章内容"""
+        if self._llm is None:
+            return f"# {title}\n\n（本文由 AI 辅助生成）"
+
+        prompt = f"""请根据标题「{title}」撰写一篇技术博客文章。
+
+要求：
+- 使用 Markdown 格式
+- 包含引言、核心内容、示例代码和总结
+- 篇幅适中，内容充实
+- 使用中文撰写
+
+标题：{title}
+"""
+        try:
+            messages = [{"role": "user", "content": prompt}]
+            content = self._llm.invoke(messages)
+            return content.strip()
+        except Exception as e:
+            print(f"[WriteBlogTool] LLM 生成内容失败: {e}")
+            return f"# {title}\n\n（本文由 AI 辅助生成）"
+
     def run(self, parameters: Dict[str, Any]) -> str:
         title = (parameters.get("title") or "").strip()
         content = (parameters.get("content") or "").strip()
@@ -49,10 +73,12 @@ class WriteBlogTool(Tool):
 
         if not title:
             return "错误：文章标题不能为空"
-        if not content:
-            return "错误：文章内容不能为空"
         if not user_id:
             return "错误：缺少作者用户 ID"
+
+        # 自动生成内容（如果未提供）
+        if not content:
+            content = self._generate_content(title, user_id)
 
         try:
             user_id = int(user_id)

@@ -19,7 +19,8 @@ class ReActAgent(Agent):
             tool_registry: ToolRegistry,
             max_steps: int,
             memory_context: List[Tuple[float, Dict[str, str]]],
-            user_id: Optional[int] = None
+            user_id: Optional[int] = None,
+            plan_manager=None,
     ):
         super().__init__(name, llm, tool_registry)
         self.input_text = None
@@ -27,6 +28,7 @@ class ReActAgent(Agent):
         self.current_react_history: List[str] = []
         self.memory_context = memory_context
         self.user_id = user_id
+        self.plan_manager = plan_manager
         print(f"{name} 初始化完成，最大步数: {max_steps}")
 
     def _get_reinforcement_prompt(self) -> str:
@@ -131,6 +133,11 @@ class ReActAgent(Agent):
                 })
                 yield {"type": "observation", "data": observation}
 
+                # 检查并发送计划 SSE 事件
+                if self.plan_manager:
+                    for event in self.plan_manager.pop_events():
+                        yield {"type": "plan", "data": event}
+
         final_answer = "抱歉，我无法在限定步数内完成这个任务。"
         yield {"type": "final_answer", "data": final_answer}
 
@@ -221,6 +228,17 @@ class ReActAgent(Agent):
         4. 如果工具返回的信息不够，继续使用其他工具或相同工具的不同参数
         5. 禁止直接回答用户问题，必须通过Thought/Action流程执行
         
+        ## 计划管理（Plan）
+        你可以使用计划工具将复杂任务分解为层级子任务，按以下流程操作：
+        1. create_plan — 创建计划，设定主目标
+        2. add_subtask — 将任务分解为子任务（挂到父任务下）
+        3. modify_task — 更新任务状态（completed / verified / abandoned）
+        4. 开始执行子任务时，将状态设为 in_progress
+
+        任务状态的传播规则：
+        - completed / verified / abandoned → 自动传播到所有子孙任务
+        - in_progress → 自动传播到所有祖先任务
+
         ## 相关对话记忆
         {memory_context}
 

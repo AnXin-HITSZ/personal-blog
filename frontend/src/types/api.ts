@@ -92,3 +92,32 @@ export interface SessionDTO {
   updatedAt: number
   messageCount: number
 }
+
+// ---- Plan / Task types ----
+
+export type TaskState = 'open' | 'in_progress' | 'completed' | 'verified' | 'abandoned'
+
+export interface PlanTask {
+  taskId?: number
+  parentTaskId?: number
+  taskPath: string
+  taskGoal: string
+  taskState: TaskState
+  displayOrder: number
+  subtasks: PlanTask[]
+}
+
+export interface Plan {
+  planId?: number
+  userId?: number
+  sessionId?: string
+  mainGoal: string
+  rootTask?: PlanTask
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface PlanEvent {
+  type: 'plan_init' | 'plan_task_added' | 'plan_task_update'
+  data: Record<string, any>
+}

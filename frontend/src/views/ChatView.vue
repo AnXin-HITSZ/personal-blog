@@ -284,62 +284,99 @@
 
         </div>
 
-        <!-- Knowledge Base Sidebar -->
+        <!-- Right Sidebar: Tab-switch between KB and Plan -->
         <aside class="w-72 shrink-0">
           <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200/80 h-full flex flex-col">
-            <div class="px-4 py-3 border-b border-gray-200/80 bg-white flex-shrink-0">
-              <div class="flex items-center justify-between">
-                <h3 class="text-xs font-bold text-gray-400 tracking-wider uppercase">Knowledge Base</h3>
-                <el-button
-                  v-if="isAdmin"
-                  type="primary"
-                  size="small"
-                  @click="showAddDialogFn"
-                  :icon="Plus"
-                  circle
-                />
-              </div>
-            </div>
-            <div class="flex-1 overflow-y-auto p-3 min-h-0">
-              <div v-if="knowledgeBases.length === 0" class="text-center py-8 text-gray-400">
-                <svg class="w-10 h-10 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-                <p class="text-sm">暂无知识库</p>
-                <p v-if="isAdmin" class="text-xs mt-1">点击右上角 + 新增</p>
-              </div>
-              <div v-else class="space-y-2">
+            <!-- Tab header -->
+            <div class="flex border-b border-gray-200/80 bg-gray-50/50 flex-shrink-0">
+              <button
+                class="flex-1 px-3 py-2 text-xs font-semibold tracking-wider uppercase transition-colors relative"
+                :class="rightTab === 'kb' ? 'text-blue-600 bg-white' : 'text-gray-400 hover:text-gray-600'"
+                @click="rightTab = 'kb'"
+              >
+                知识库
                 <div
-                  v-for="kb in knowledgeBases"
-                  :key="kb.ragId"
-                  class="group rounded-lg border border-gray-200 hover:border-blue-300 transition-colors"
-                >
-                  <div class="px-3 py-2.5">
-                    <div class="flex items-start justify-between">
-                      <div class="min-w-0 flex-1">
-                        <div class="flex items-center gap-1.5">
-                          <svg class="w-4 h-4 text-blue-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                          </svg>
-                          <span class="text-sm font-medium text-gray-800 truncate">{{ kb.name }}</span>
+                  v-if="rightTab === 'kb'"
+                  class="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-500 rounded-full"
+                />
+              </button>
+              <button
+                class="flex-1 px-3 py-2 text-xs font-semibold tracking-wider uppercase transition-colors relative"
+                :class="rightTab === 'plan' ? 'text-purple-600 bg-white' : 'text-gray-400 hover:text-gray-600'"
+                @click="rightTab = 'plan'"
+              >
+                计划
+                <div
+                  v-if="rightTab === 'plan'"
+                  class="absolute bottom-0 left-2 right-2 h-0.5 bg-purple-500 rounded-full"
+                />
+              </button>
+            </div>
+
+            <!-- Knowledge Base Panel -->
+            <div v-show="rightTab === 'kb'" class="flex-1 flex flex-col min-h-0">
+              <div class="px-4 py-3 border-b border-gray-200/80 bg-white flex-shrink-0">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-xs font-bold text-gray-400 tracking-wider uppercase">Knowledge Base</h3>
+                  <el-button
+                    v-if="isAdmin"
+                    type="primary"
+                    size="small"
+                    @click="showAddDialogFn"
+                    :icon="Plus"
+                    circle
+                  />
+                </div>
+              </div>
+              <div class="flex-1 overflow-y-auto p-3 min-h-0">
+                <div v-if="knowledgeBases.length === 0" class="text-center py-8 text-gray-400">
+                  <svg class="w-10 h-10 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  <p class="text-sm">暂无知识库</p>
+                  <p v-if="isAdmin" class="text-xs mt-1">点击右上角 + 新增</p>
+                </div>
+                <div v-else class="space-y-2">
+                  <div
+                    v-for="kb in knowledgeBases"
+                    :key="kb.ragId"
+                    class="group rounded-lg border border-gray-200 hover:border-blue-300 transition-colors"
+                  >
+                    <div class="px-3 py-2.5">
+                      <div class="flex items-start justify-between">
+                        <div class="min-w-0 flex-1">
+                          <div class="flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-blue-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                            </svg>
+                            <span class="text-sm font-medium text-gray-800 truncate">{{ kb.name }}</span>
+                          </div>
+                          <div class="flex items-center gap-2 mt-1">
+                            <span class="text-[11px] text-gray-400">{{ kb.fileCount || 0 }} 文件</span>
+                            <span
+                              class="text-[11px] px-1.5 py-0.5 rounded-full"
+                              :class="kb.status === 1 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'"
+                            >{{ kb.status === 1 ? '已索引' : '未索引' }}</span>
+                          </div>
+                          <p v-if="kb.description" class="text-xs text-gray-400 mt-1 truncate">{{ kb.description }}</p>
                         </div>
-                        <div class="flex items-center gap-2 mt-1">
-                          <span class="text-[11px] text-gray-400">{{ kb.fileCount || 0 }} 文件</span>
-                          <span
-                            class="text-[11px] px-1.5 py-0.5 rounded-full"
-                            :class="kb.status === 1 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'"
-                          >{{ kb.status === 1 ? '已索引' : '未索引' }}</span>
+                        <div v-if="isAdmin" class="flex gap-1 shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <el-button size="small" :icon="Edit" circle @click="editKB(kb)" />
+                          <el-button size="small" type="danger" :icon="Delete" circle @click="handleDeleteKB(kb)" />
                         </div>
-                        <p v-if="kb.description" class="text-xs text-gray-400 mt-1 truncate">{{ kb.description }}</p>
-                      </div>
-                      <div v-if="isAdmin" class="flex gap-1 shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <el-button size="small" :icon="Edit" circle @click="editKB(kb)" />
-                        <el-button size="small" type="danger" :icon="Delete" circle @click="handleDeleteKB(kb)" />
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
+            </div>
+
+            <!-- Plan Panel -->
+            <div v-show="rightTab === 'plan'" class="flex-1 min-h-0">
+              <PlanPanel
+                :plan="currentPlan"
+                @delete="currentPlan = null"
+              />
             </div>
           </div>
         </aside>
@@ -443,8 +480,10 @@ import { streamReActAgentChat } from '@/api/agent'
 import { getRAGListApi, addRAGApi, updateRAGApi, deleteRAGApi, uploadRAGFilesApi } from '@/api/rag'
 import { initSessionApi } from '@/api/session'
 import { listSessionsApi, getSessionMessagesApi, deleteSessionApi, updateSessionTitleApi } from '@/api/history'
-import type { ChatRequest, ReActData, MemoryItem, RAGKnowledgeBase, SessionDTO } from '@/types/api'
+import { getPlanBySessionApi } from '@/api/plan'
+import type { ChatRequest, ReActData, MemoryItem, RAGKnowledgeBase, SessionDTO, Plan, PlanEvent } from '@/types/api'
 import HistorySidebar from '@/components/Chat/HistorySidebar.vue'
+import PlanPanel from '@/components/Plan/PlanPanel.vue'
 import MarkdownIt from 'markdown-it'
 
 const md = new MarkdownIt({
@@ -498,6 +537,12 @@ const fileInputRef = ref<HTMLInputElement>()
 const uploadedFileCount = ref(0)
 const uploadingFiles = ref(false)
 const indexingStatus = ref('')  // '' | 'indexing' | 'done' | 'failed'
+
+// Right sidebar tab state
+const rightTab = ref<'kb' | 'plan'>('kb')
+
+// Plan state
+const currentPlan = ref<Plan | null>(null)
 
 const isAdmin = computed(() => authStore.userInfo?.isAdmin === 1)
 
@@ -714,6 +759,15 @@ const handleSendMessage = async () => {
 
   loading.value = true
 
+  // 确保用户信息已加载（防止页面刷新后 userInfo 尚未就绪）
+  if (!authStore.userInfo && authStore.token) {
+    try {
+      await authStore.getUserInfo()
+    } catch (e) {
+      console.error('无法获取用户信息:', e)
+    }
+  }
+
   // Add user message
   addMessage('user', text)
   inputMessage.value = ''
@@ -751,6 +805,12 @@ const handleSendMessage = async () => {
           }))
           lastMsg.memories = memories
           lastMsg.memoriesCollapsed = true
+          return
+        }
+
+        // plan 事件：更新任务计划面板
+        if (type === 'plan') {
+          handlePlanEvent(data)
           return
         }
 
@@ -853,6 +913,7 @@ const handleSelectSession = async (session: SessionDTO) => {
       memoriesCollapsed: true,
     }))
     messages.value = formattedMessages
+    await loadPlan()
   } catch (e) {
     console.error('加载会话消息失败:', e)
     ElMessage.error('加载历史消息失败')
@@ -893,6 +954,7 @@ const handleNewChat = async () => {
     abortStream = null
   }
   messages.value = []
+  currentPlan.value = null
   loading.value = false
   await initNewSession()
   scrollToBottom()
@@ -910,6 +972,55 @@ const initNewSession = async () => {
 
 const handleClearChat = async () => {
   await handleNewChat()
+}
+
+const handlePlanEvent = (eventData: any) => {
+  if (!eventData || !eventData.type) return
+  const { type, data } = eventData
+
+  if (type === 'plan_init' && data) {
+    // Full plan DTO
+    currentPlan.value = data as Plan
+  } else if (type === 'plan_task_added' && data) {
+    // Parent task was updated with new subtask
+    if (currentPlan.value?.rootTask) {
+      updateTaskInTree(currentPlan.value.rootTask, data as any)
+    }
+  } else if (type === 'plan_task_update' && data) {
+    // Task state updated
+    if (currentPlan.value?.rootTask) {
+      updateTaskInTree(currentPlan.value.rootTask, data as any)
+    }
+  }
+}
+
+const updateTaskInTree = (node: any, updatedTask: any) => {
+  if (node.taskPath === updatedTask.taskPath) {
+    node.taskState = updatedTask.taskState
+    node.subtasks = updatedTask.subtasks || []
+    return true
+  }
+  for (const sub of node.subtasks || []) {
+    if (updateTaskInTree(sub, updatedTask)) return true
+  }
+  return false
+}
+
+const loadPlan = async () => {
+  if (!sessionId.value) {
+    currentPlan.value = null
+    return
+  }
+  try {
+    const res = await getPlanBySessionApi(sessionId.value)
+    if (res.success && res.data) {
+      currentPlan.value = res.data as Plan
+    } else {
+      currentPlan.value = null
+    }
+  } catch {
+    currentPlan.value = null
+  }
 }
 
 const handleLogout = () => {
