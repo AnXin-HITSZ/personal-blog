@@ -1,5 +1,6 @@
 package com.anxin_hitsz.config;
 
+import com.anxin_hitsz.config.filter.JwtAuthenticationFilter;
 import jakarta.annotation.Resource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

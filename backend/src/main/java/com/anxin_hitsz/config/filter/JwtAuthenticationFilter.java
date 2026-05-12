@@ -1,5 +1,6 @@
 package com.anxin_hitsz.config.filter;
 
+import com.anxin_hitsz.service.impl.user.account.UserDetailsServiceImpl;
 import com.anxin_hitsz.utils.JwtUtils;
 import jakarta.annotation.Resource;
 import jakarta.servlet.FilterChain;
