@@ -1,0 +1,134 @@
+services:
+  # ============================================
+  # MySQL 数据库
+  # ============================================
+  mysql:
+    image: mysql:8.0
+    container_name: personal-blog-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: personal_blog
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --default-time-zone=+8:00
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ============================================
+  # Redis（AI Agent 记忆存储）
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: personal-blog-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ============================================
+  # Qdrant - 向量数据库
+  # ============================================
+  qdrant:
+    image: qdrant/qdrant:v1.12.5
+    container_name: personal-blog-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"  # HTTP API
+      - "6334:6334"  # gRPC（可选）
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:-}
+      QDRANT__SERVICE__GRPC_PORT: 6334
+
+  # ============================================
+  # Backend - Spring Boot
+  # ============================================
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/backend.Dockerfile
+    container_name: personal-blog-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Spring Boot 会自动将 SPRING_DATASOURCE_* 映射到 spring.datasource.*
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/personal_blog?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+      # DB_USERNAME / DB_PASSWORD 会被 application.yml 中的 ${DB_USERNAME}/${DB_PASSWORD} 引用
+      DB_USERNAME: ${DB_USERNAME:-root}
+      DB_PASSWORD: ${DB_PASSWORD:-root123456}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-86400000}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+      FASTAPI_SERVICE_URL: http://agent:8000
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+
+  # ============================================
+  # Agent - FastAPI Python（AI 对话服务）
+  # ============================================
+  agent:
+    build:
+      context: ..
+      dockerfile: deploy/agent.Dockerfile
+    container_name: personal-blog-agent
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      LLM_MODEL_ID: ${LLM_MODEL_ID}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_BASE_URL: ${LLM_BASE_URL}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+      REDIS_URL: redis://redis:6379/0
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ============================================
+  # Frontend - Nginx（前端静态文件 + 反向代理）
+  # ============================================
+  frontend:
+    build:
+      context: ..
+      dockerfile: deploy/frontend.Dockerfile
+    container_name: personal-blog-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - agent
+
+volumes:
+  mysql_data:
+  redis_data:
+  qdrant_data:
