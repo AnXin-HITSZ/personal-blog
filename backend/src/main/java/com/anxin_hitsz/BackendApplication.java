@@ -1,4 +1,4 @@
-package com.anxin_hitsz.backend;
+package com.anxin_hitsz;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: backend
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+logging:
+  level:
+    org.springframework.security: DEBUG
+
+jwt:
+  secret: ${JWT_SECRET_KEY}
+  expiration: ${JWT_EXPIRATION}
+
+internal:
+  api-key: ${INTERNAL_API_KEY:}
+
+fastapi:
+  service:
+    url: ${FASTAPI_SERVICE_URL}
+    timeout: 60000
