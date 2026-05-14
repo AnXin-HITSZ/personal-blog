@@ -14,6 +14,11 @@
   --el-border-radius-base: 8px;
 }
 
+/* ── 全局链接去下划线 ── */
+a {
+  text-decoration: none !important;
+}
+
 /* ── 全局过渡 ── */
 .fade-enter-active,
 .fade-leave-active {
@@ -94,5 +99,4 @@
 }
 .markdown-body a {
   color: #4f46e5;
-  text-decoration: underline;
 }

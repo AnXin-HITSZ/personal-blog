@@ -1,0 +1,25 @@
+# Python 构建产物（递归所有子目录）
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Agent 虚拟环境
+agent/.venv/
+
+# Agent 缓存和上传
+agent/.model_cache/
+agent/uploads/
+
+# 环境变量（覆盖所有子目录，含 agent/.env、deploy/.env 等）
+.env
+
+# Claude 配置
+.claude/
+
+# 日志
+*.log
+
+# IDE（覆盖所有子目录）
+.idea/
+.vscode/
+*.iml

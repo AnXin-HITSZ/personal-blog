@@ -3,7 +3,9 @@ import { ref, onMounted } from 'vue'
 import { getArticlesApi } from '@/api/article'
 import type { Article } from '@/types'
 import ArticleCard from '@/components/ArticleCard.vue'
+import { useUserStore } from '@/stores/user'
 
+const store = useUserStore()
 const articles = ref<Article[]>([])
 const loading = ref(true)
 
@@ -36,7 +38,7 @@ onMounted(async () => {
             用文字记录成长的点滴。
           </p>
           <div class="mt-8 flex items-center justify-center gap-4">
-            <router-link to="/register">
+            <router-link :to="store.isLoggedIn ? '/admin/editor' : '/register'">
               <el-button type="primary" size="large" round>
                 开始写作
                 <el-icon class="ml-1"><Edit /></el-icon>

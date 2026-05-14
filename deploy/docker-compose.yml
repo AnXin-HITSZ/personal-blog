@@ -109,6 +109,16 @@ services:
       REDIS_URL: redis://redis:6379/0
       REDIS_HOST: redis
       REDIS_PORT: "6379"
+      # 部署流水线配置
+      DEPLOY_WORK_DIR: /data/deploy
+      DEPLOY_REPO_URL: ${DEPLOY_REPO_URL:-}
+      DEPLOY_DEFAULT_BRANCH: ${DEPLOY_DEFAULT_BRANCH:-main}
+      DEPLOY_WEBHOOK_SECRET: ${DEPLOY_WEBHOOK_SECRET:-}
+      DEPLOY_HEALTH_CHECK_RETRIES: "10"
+      DEPLOY_HEALTH_CHECK_INTERVAL: "3"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../:/data/deploy
     depends_on:
       redis:
         condition: service_healthy

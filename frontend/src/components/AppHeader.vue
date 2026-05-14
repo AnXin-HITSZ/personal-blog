@@ -10,8 +10,11 @@ const store = useUserStore()
 const menuItems = computed(() => {
   const items = [
     { label: '首页', path: '/', icon: 'HomeFilled' },
+    { label: '问答', path: '/qa', icon: 'ChatLineSquare' },
   ]
   if (store.isLoggedIn) {
+    items.push({ label: '知识库', path: '/admin/knowledge-base', icon: 'Collection' })
+    items.push({ label: '部署', path: '/admin/deploy', icon: 'Upload' })
     items.push({ label: '管理后台', path: '/admin', icon: 'Setting' })
   }
   return items
@@ -42,21 +45,16 @@ function handleLogout() {
 
       <!-- Nav -->
       <nav class="flex items-center gap-1">
-        <router-link
+        <el-button
           v-for="item in menuItems"
           :key="item.path"
-          :to="item.path"
-          v-slot="{ isExactActive }"
-          custom
+          :text="router.currentRoute.value.path !== item.path"
+          :type="router.currentRoute.value.path === item.path ? 'primary' : 'default'"
+          class="!px-4 !h-9"
+          @click="router.push(item.path)"
         >
-          <el-button
-            :text="!isExactActive"
-            :type="isExactActive ? 'primary' : 'default'"
-            class="!px-4 !h-9"
-          >
-            {{ item.label }}
-          </el-button>
-        </router-link>
+          {{ item.label }}
+        </el-button>
 
         <!-- Auth buttons -->
         <div class="ml-3 pl-3 border-l border-gray-200 flex items-center gap-2">

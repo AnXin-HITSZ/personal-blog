@@ -79,10 +79,13 @@ public class SecurityConfig {
                         .requestMatchers("/user/account/register", "/user/account/login").permitAll()
                         // 文章列表：允许所有用户（含未登录）查看
                         .requestMatchers(HttpMethod.GET, "/api/article/**").permitAll()
-                        // AI 对话、RAG、任务计划：允许所有用户访问（内部由 Controller 做身份验证）
-                        .requestMatchers("/api/agent/**").permitAll()
-                        .requestMatchers("/api/rag/**").permitAll()
-                        .requestMatchers("/api/plan/**").permitAll()
+                        // SSE 流式对话：异步分发时 SecurityContext 会丢失，放行以支持 SseEmitter 异步回调
+                        // 实际认证由 JwtAuthenticationFilter 在初次请求时完成
+                        .requestMatchers(HttpMethod.POST, "/api/agent/chat/stream").permitAll()
+                        // 部署 Webhook：GitHub/Gitee 回调，需直接放行
+                        .requestMatchers(HttpMethod.POST, "/api/agent/deploy/webhook").permitAll()
+                        // 部署 SSE 流：放行以便前端实时查看部署进度
+                        .requestMatchers(HttpMethod.GET, "/api/agent/deploy/*/stream").permitAll()
                         // 其他请求需要认证
                         .anyRequest().authenticated()
                 )

@@ -5,9 +5,10 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# 安装系统依赖
+# 安装系统依赖（含 git 用于部署流水线）
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制依赖文件并安装

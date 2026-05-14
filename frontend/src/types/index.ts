@@ -31,3 +31,89 @@ export interface RegisterForm {
   password: string
   confirmedPassword: string
 }
+
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+  timestamp?: string
+}
+
+export interface ChatResponse {
+  success: boolean
+  answer: string
+  errorMessage: string | null
+}
+
+export interface KnowledgeBaseFile {
+  filename: string
+  file_path: string
+  size: number
+  last_modified: string
+}
+
+export interface AgentResult {
+  code: number
+  message: string
+  data: ChatResponse
+}
+
+export interface ToolCallEvent {
+  name: string
+  status: 'start' | 'end'
+  result?: string
+}
+
+/** ─── 部署相关类型 ─── */
+
+export interface DeploymentSummary {
+  deployment_id: string
+  trigger_type: 'webhook' | 'manual'
+  target_branch: string
+  commit_hash: string
+  commit_message: string
+  final_status: 'running' | 'success' | 'failed' | 'rolled_back' | 'cancelled'
+  current_phase: string
+  created_at: string
+  updated_at: string
+  duration_ms: number
+}
+
+export interface PhaseInfo {
+  name: string
+  label: string
+  status: 'pending' | 'running' | 'success' | 'failed' | 'skipped'
+}
+
+export interface LogEntry {
+  phase: string
+  message: string
+  timestamp: string
+}
+
+export interface DeploymentDetail {
+  deployment_id: string
+  trigger_type: string
+  target_branch: string
+  commit_hash: string
+  previous_commit_hash: string
+  commit_message: string
+  final_status: string
+  current_phase: string
+  phases: PhaseInfo[]
+  build_results: Record<string, any>
+  verify_results: Record<string, any>
+  logs: LogEntry[]
+  error: string
+  created_at: string
+  updated_at: string
+  duration_ms: number
+}
+
+/** 会话摘要（用于历史列表） */
+export interface SessionSummary {
+  session_id: string
+  title: string
+  message_count: number
+  created_at: string
+  updated_at: string
+}

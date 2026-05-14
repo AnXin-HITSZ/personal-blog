@@ -10,6 +10,11 @@ const router = createRouter({
       component: () => import('@/views/Home.vue'),
     },
     {
+      path: '/qa',
+      name: 'Qa',
+      component: () => import('@/views/Qa.vue'),
+    },
+    {
       path: '/login',
       name: 'Login',
       component: () => import('@/views/Login.vue'),
@@ -34,6 +39,18 @@ const router = createRouter({
       path: '/admin/editor/:id?',
       name: 'Editor',
       component: () => import('@/views/admin/Editor.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/admin/knowledge-base',
+      name: 'KnowledgeBase',
+      component: () => import('@/views/admin/KnowledgeBase.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/admin/deploy',
+      name: 'DeployDashboard',
+      component: () => import('@/views/admin/DeployDashboard.vue'),
       meta: { requiresAuth: true },
     },
   ],
