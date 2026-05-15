@@ -102,6 +102,7 @@ services:
     ports:
       - "8000:8000"
     environment:
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY}
       LLM_MODEL_ID: ${LLM_MODEL_ID}
       LLM_API_KEY: ${LLM_API_KEY}
       LLM_BASE_URL: ${LLM_BASE_URL}
