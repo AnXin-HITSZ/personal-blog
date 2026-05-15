@@ -42,9 +42,9 @@ class RagAgentService:
         self.system_prompt = self._build_system_prompt()
 
         self.model = ChatOpenAI(
-            model=config.deepseek_model,
-            api_key=config.deepseek_api_key,
-            base_url=config.deepseek_base_url,
+            model=config.llm_model_id,
+            api_key=config.llm_api_key,
+            base_url=config.llm_base_url,
             temperature=0.7,
             streaming=streaming,
         )
@@ -58,7 +58,7 @@ class RagAgentService:
 
         logger.info(
             f"RAG Agent 服务初始化完成 (ChatOpenAI + DeepSeek), "
-            f"model={config.deepseek_model}, streaming={streaming}"
+            f"model={config.llm_model_id}, streaming={streaming}"
         )
 
     async def _initialize_agent(self):

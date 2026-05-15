@@ -25,3 +25,13 @@ export async function getDeployDetailApi(id: string): Promise<ApiResult<Deployme
 export async function cancelDeployApi(id: string): Promise<ApiResult> {
   return request.post(`${BASE}/${id}/cancel`).then((r) => r.data)
 }
+
+/** 获取 Agent 变更 diff（审批前审查用） */
+export async function getDeployDiffApi(id: string): Promise<ApiResult<{ diff: string }>> {
+  return request.get(`${BASE}/${id}/diff`).then((r) => r.data)
+}
+
+/** 审批通过 Agent 变更，继续部署 */
+export async function approveDeployApi(id: string): Promise<ApiResult> {
+  return request.post(`${BASE}/${id}/approve`).then((r) => r.data)
+}

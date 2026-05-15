@@ -57,7 +57,7 @@ a {
   background: #9ca3af;
 }
 
-/* ── Markdown 预览区 ── */
+/* ── Markdown 渲染区 ── */
 .markdown-body {
   line-height: 1.8;
 }
@@ -69,34 +69,128 @@ a {
   font-weight: 600;
   color: #1f2937;
 }
+.markdown-body h1 { font-size: 1.35em; }
+.markdown-body h2 { font-size: 1.15em; }
+.markdown-body h3 { font-size: 1.05em; }
+.markdown-body h4 { font-size: 1em; }
 .markdown-body p {
   margin-bottom: 1em;
 }
+.markdown-body p:last-child {
+  margin-bottom: 0;
+}
+/* 行内代码 */
 .markdown-body code {
   background: #f3f4f6;
   padding: 0.2em 0.4em;
   border-radius: 4px;
   font-size: 0.875em;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', monospace;
+  word-break: break-word;
+}
+/* 代码块 - 容器 */
+.markdown-body pre {
+  position: relative;
+  background: #f6f8fa;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 0.75em 0;
+  overflow-x: auto;
 }
 .markdown-body pre code {
   background: transparent;
   padding: 0;
+  font-size: 0.825rem;
+  line-height: 1.6;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', monospace;
+  color: #24292e;
 }
-.markdown-body img {
-  max-width: 100%;
-  border-radius: 8px;
+/* 代码块语言标签 */
+.markdown-body pre[data-language]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.4rem;
+  right: 0.75rem;
+  font-size: 0.65rem;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-family: inherit;
 }
+/* hljs 在代码块内透明（pre 背景透出） */
+.markdown-body .hljs {
+  background: transparent;
+  padding: 0;
+}
+/* 表格 */
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+  font-size: 0.9em;
+}
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid #e5e7eb;
+  padding: 0.5em 0.75em;
+  text-align: left;
+}
+.markdown-body th {
+  background: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+}
+.markdown-body tr:nth-child(even) {
+  background: #fafafa;
+}
+/* 引用 */
 .markdown-body blockquote {
   border-left: 4px solid #6366f1;
-  padding-left: 1em;
+  padding: 0.5em 1em;
   color: #6b7280;
   margin: 1em 0;
+  background: #fafaff;
+  border-radius: 0 6px 6px 0;
 }
+.markdown-body blockquote p:last-child {
+  margin-bottom: 0;
+}
+/* 列表 */
 .markdown-body ul,
 .markdown-body ol {
   padding-left: 1.5em;
   margin-bottom: 1em;
 }
+.markdown-body li {
+  margin-bottom: 0.25em;
+}
+/* 链接 */
 .markdown-body a {
   color: #4f46e5;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.markdown-body a:hover {
+  color: #4338ca;
+}
+/* 图片 */
+.markdown-body img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 0.5em 0;
+}
+/* 水平分割线 */
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 1.5em 0;
+}
+/* 加粗和斜体 */
+.markdown-body strong {
+  font-weight: 600;
+  color: #111827;
+}
+.markdown-body em {
+  font-style: italic;
 }

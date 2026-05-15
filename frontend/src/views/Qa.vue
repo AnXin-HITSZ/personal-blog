@@ -1,7 +1,22 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted, watch } from 'vue'
 import { marked } from 'marked'
+import { markedHighlight } from 'marked-highlight'
+import hljs from 'highlight.js'
 import { streamChatApi, chatApi, clearSessionApi, fetchHistoryApi, listSessionsApi, deleteSessionApi } from '@/api/agent'
+
+// 配置 marked 语法高亮
+marked.use(markedHighlight({
+  langPrefix: 'hljs language-',
+  highlight(code: string, lang: string): string {
+    const language = hljs.getLanguage(lang) ? lang : 'plaintext'
+    try {
+      return hljs.highlight(code, { language }).value
+    } catch {
+      return hljs.highlightAuto(code).value
+    }
+  },
+}))
 import type { ChatMessage, ToolCallEvent, SessionSummary } from '@/types'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Promotion } from '@element-plus/icons-vue'
@@ -261,7 +276,13 @@ async function clearSession() {
 function renderMarkdown(text: string): string {
   if (!text) return ''
   try {
-    return marked.parse(text, { async: false }) as string
+    let html = marked.parse(text) as string
+    // 给 <pre> 添加 data-language 属性，用于 CSS 显示语言标签
+    html = html.replace(
+      /<pre><code class="hljs language-(\w+)">/g,
+      '<pre data-language="$1"><code class="hljs language-$1">'
+    )
+    return html
   } catch {
     return text
   }
@@ -433,7 +454,7 @@ function formatTime(isoStr: string): string {
               <!-- Assistant: markdown + streaming cursor -->
               <div v-else class="flex flex-wrap items-start gap-0">
                 <div
-                  class="markdown-body text-sm leading-relaxed prose-headings:mb-2 prose-p:mb-1"
+                  class="markdown-body text-sm leading-relaxed"
                   v-html="renderMarkdown(msg.content)"
                 />
                 <span

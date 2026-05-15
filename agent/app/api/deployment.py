@@ -1,6 +1,6 @@
 """部署接口模块
 
-提供 Webhook 接收、手动触发、SSE 流式进度、历史查询等部署相关接口
+提供 Agent 驱动的 CI/CD 部署接口，兼容原有前端轮询协议。
 """
 
 import hashlib
@@ -13,7 +13,7 @@ from loguru import logger
 
 from app.config import config
 from app.models.deployment import ManualTriggerRequest, WebhookPayload
-from app.services.deployment_service import deployment_service
+from app.services.cicd_service import cicd_service
 from app.services.deployment_memory import deployment_memory
 
 router = APIRouter()
@@ -40,12 +40,9 @@ def _verify_gitee_token(token: str) -> bool:
 async def deploy_webhook(request: Request):
     """GitHub/Gitee Webhook 入口
 
-    接收推送事件，自动触发部署流程
+    接收推送事件，自动触发 Agent 驱动的部署流程
     """
-    # 读取原始 body
     body = await request.body()
-
-    # 检测来源
     user_agent = request.headers.get("User-Agent", "")
     is_github = "GitHub-Hookshot" in user_agent
     is_gitee = "Gitee" in user_agent or "git-oschina" in user_agent
@@ -89,27 +86,22 @@ async def deploy_webhook(request: Request):
         logger.warning(f"已有部署运行中: {running}")
         return {"message": f"已有部署运行中: {running}", "deployment_id": running}
 
-    # 后台启动部署
+    # 后台启动 Agent 部署
     import asyncio
-    deployment_id = None
 
     async def run_deploy():
-        nonlocal deployment_id
-        async for event in deployment_service.execute(
+        async for event in cicd_service.execute(
             trigger_type="webhook",
-            trigger_data=payload.model_dump(),
             branch="main",
         ):
-            if event.get("type") == "complete":
-                deployment_id = event.get("deployment_id")
-            elif event.get("type") == "phase_update":
-                logger.info(f"[Webhook 部署] 阶段: {event.get('phase')} = {event.get('status')}")
+            if event.get("type") == "phase_update":
+                logger.info(f"[Webhook Agent 部署] 阶段: {event.get('phase')} = {event.get('status')}")
 
     asyncio.create_task(run_deploy())
-    logger.info("Webhook 触发的部署已启动")
+    logger.info("Webhook 触发的 Agent 部署已启动")
 
     return {
-        "message": "部署已启动",
+        "message": "Agent 部署已启动",
         "commit": payload.commit_hash,
         "branch": payload.ref,
     }
@@ -117,10 +109,7 @@ async def deploy_webhook(request: Request):
 
 @router.post("/deploy/trigger")
 async def deploy_manual(request: ManualTriggerRequest):
-    """手动触发部署
-
-    通过登录用户（JWT 认证）手动触发部署
-    """
+    """手动触发 Agent 驱动的部署"""
     branch = request.branch or config.deploy_default_branch
 
     # 检查是否已有部署运行中
@@ -128,32 +117,31 @@ async def deploy_manual(request: ManualTriggerRequest):
     if running:
         raise HTTPException(status_code=409, detail=f"已有部署运行中: {running}")
 
-    # 预生成 deployment_id，供前端立即追踪
+    import asyncio
     from datetime import datetime
     import uuid
+
     deployment_id = f"deploy-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
 
-    import asyncio
-
     async def run_deploy():
-        async for event in deployment_service.execute(
+        async for event in cicd_service.execute(
             trigger_type="manual",
             branch=branch,
             deployment_id=deployment_id,
         ):
             if event.get("type") == "phase_update":
-                logger.info(f"[手动部署] 阶段: {event.get('phase')} = {event.get('status')}")
+                logger.info(f"[手动 Agent 部署] 阶段: {event.get('phase')} = {event.get('status')}")
 
     asyncio.create_task(run_deploy())
 
-    return {"message": "部署已启动", "branch": branch, "deployment_id": deployment_id}
+    return {"message": "Agent 部署已启动", "branch": branch, "deployment_id": deployment_id}
 
 
 @router.get("/deploy/history")
 async def deploy_history(page: int = 1, size: int = 20):
     """获取部署历史"""
     try:
-        result = await deployment_service.get_history(page, size)
+        result = await cicd_service.get_history(page, size)
         return {"code": 200, "message": "success", "data": result}
     except Exception as e:
         logger.error(f"获取部署历史失败: {e}")
@@ -162,9 +150,9 @@ async def deploy_history(page: int = 1, size: int = 20):
 
 @router.get("/deploy/{deployment_id}")
 async def deploy_detail(deployment_id: str):
-    """获取部署详情"""
+    """获取部署详情（兼容原前端轮询协议）"""
     try:
-        state = await deployment_service.get_state(deployment_id)
+        state = await cicd_service.get_state(deployment_id)
         return {"code": 200, "message": "success", "data": state}
     except Exception as e:
         logger.error(f"获取部署详情失败: {e}")
@@ -175,24 +163,40 @@ async def deploy_detail(deployment_id: str):
 async def cancel_deploy(deployment_id: str):
     """取消部署"""
     try:
-        await deployment_service.cancel(deployment_id)
+        await cicd_service.cancel(deployment_id)
         return {"code": 200, "message": "已取消", "data": None}
+    except Exception as e:
+        return {"code": 500, "message": str(e), "data": None}
+
+
+@router.get("/deploy/{deployment_id}/diff")
+async def deploy_diff(deployment_id: str):
+    """获取 Agent 修改的代码 diff（用于审批前审查）"""
+    try:
+        state = await deployment_memory.get_state(deployment_id)
+        pending_diff = state.get("pending_diff", "")
+        return {"code": 200, "message": "success", "data": {"diff": pending_diff}}
+    except Exception as e:
+        return {"code": 500, "message": str(e), "data": None}
+
+
+@router.post("/deploy/{deployment_id}/approve")
+async def approve_deploy(deployment_id: str):
+    """审批通过 Agent 的变更，继续部署"""
+    try:
+        # 标记审批通过（CICDState 在下一轮 replanner 中检查此字段）
+        await deployment_memory.save_state(deployment_id, {"approval_granted": True})
+        return {"code": 200, "message": "已批准", "data": None}
     except Exception as e:
         return {"code": 500, "message": str(e), "data": None}
 
 
 @router.get("/deploy/{deployment_id}/stream")
 async def deploy_stream(deployment_id: str):
-    """部署流水线 SSE 事件流
-
-    返回实时的部署进度事件
-    """
+    """部署流水线 SSE 事件流"""
     async def event_generator():
         try:
-            async for event in deployment_service.execute(
-                trigger_type="manual",
-                branch="main",
-            ):
+            async for event in cicd_service.execute(trigger_type="manual", branch="main"):
                 yield {
                     "event": "message",
                     "data": json.dumps(event, ensure_ascii=False),

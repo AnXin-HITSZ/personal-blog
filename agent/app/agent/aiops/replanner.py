@@ -131,9 +131,9 @@ async def replanner(state: PlanExecuteState) -> Dict[str, Any]:
     if len(past_steps) >= MAX_STEPS:
         logger.warning(f"已执行 {len(past_steps)} 个步骤，超过最大限制 {MAX_STEPS}，强制生成最终响应")
         llm = ChatOpenAI(
-            model=config.deepseek_model,
-            api_key=config.deepseek_api_key,
-            base_url=config.deepseek_base_url,
+            model=config.llm_model_id,
+            api_key=config.llm_api_key,
+            base_url=config.llm_base_url,
             temperature=0
         )
         return await _generate_response(state, llm)
@@ -162,9 +162,9 @@ async def replanner(state: PlanExecuteState) -> Dict[str, Any]:
 
     # 创建 LLM
     llm = ChatOpenAI(
-        model=config.deepseek_model,
-        api_key=config.deepseek_api_key,
-        base_url=config.deepseek_base_url,
+        model=config.llm_model_id,
+        api_key=config.llm_api_key,
+        base_url=config.llm_base_url,
         temperature=0
     )
 

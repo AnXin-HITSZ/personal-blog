@@ -28,10 +28,10 @@ class Settings(BaseSettings):
     dashscope_api_key: str = ""
     dashscope_embedding_model: str = "text-embedding-v4"  # v4 支持多种维度（默认 1024）
 
-    # DeepSeek 配置（OpenAI 兼容接口，用于 LLM 对话）
-    deepseek_api_key: str = ""
-    deepseek_base_url: str = "https://api.deepseek.com"
-    deepseek_model: str = "deepseek-chat"
+    # LLM 配置（OpenAI 兼容接口，支持 DeepSeek 等）
+    llm_api_key: str = ""
+    llm_base_url: str = "https://api.deepseek.com"
+    llm_model_id: str = "deepseek-chat"
 
     # Qdrant 配置
     qdrant_url: str = "http://localhost:6333"

@@ -51,9 +51,9 @@ async def executor(state: PlanExecuteState) -> Dict[str, Any]:
 
         # 创建 LLM（绑定工具）
         llm = ChatOpenAI(
-            model=config.deepseek_model,
-            api_key=config.deepseek_api_key,
-            base_url=config.deepseek_base_url,
+            model=config.llm_model_id,
+            api_key=config.llm_api_key,
+            base_url=config.llm_base_url,
             temperature=0
         )
         llm_with_tools = llm.bind_tools(all_tools)

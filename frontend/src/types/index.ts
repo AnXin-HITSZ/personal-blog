@@ -117,3 +117,33 @@ export interface SessionSummary {
   created_at: string
   updated_at: string
 }
+
+/** ─── Agent CI/CD 新增类型 ─── */
+
+/** Agent 思考/诊断事件 */
+export interface AgentThought {
+  content: string
+  phase: string
+  plan?: string[]
+  detail?: string
+}
+
+/** Agent 修复尝试记录 */
+export interface FixAttempt {
+  attempt: number
+  max_retries: number
+  target?: string
+  diff?: string
+  phase: string
+}
+
+/** 扩展的部署详情（含 Agent 字段） */
+export interface AgentDeploymentDetail extends DeploymentDetail {
+  agent_thoughts?: AgentThought[]
+  fix_attempts?: FixAttempt[]
+  needs_approval?: boolean
+  approval_granted?: boolean
+  pending_diff?: string
+  response?: string
+  report?: string
+}

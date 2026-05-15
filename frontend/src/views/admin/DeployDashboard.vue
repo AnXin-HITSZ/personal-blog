@@ -2,12 +2,14 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
-import type { DeploymentSummary, DeploymentDetail, PhaseInfo, LogEntry } from '@/types'
+import type { DeploymentSummary, DeploymentDetail, AgentThought, FixAttempt } from '@/types'
+import { marked } from 'marked'
 import {
   triggerDeployApi,
   getDeployHistoryApi,
   getDeployDetailApi,
   cancelDeployApi,
+  approveDeployApi,
 } from '@/api/deployment'
 
 // ─── 状态 ───
@@ -21,6 +23,13 @@ const page = ref(1)
 const activeDeploymentId = ref<string | null>(null)
 const activeDetail = ref<DeploymentDetail | null>(null)
 const pollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
+
+// Agent 相关状态
+const agentThoughts = ref<AgentThought[]>([])
+const fixAttempts = ref<FixAttempt[]>([])
+const showDiffDialog = ref(false)
+const pendingDiff = ref('')
+const approving = ref(false)
 
 // 触发弹窗
 const showTriggerModal = ref(false)
@@ -113,15 +122,34 @@ function startPolling(deployId: string) {
     try {
       const res = await getDeployDetailApi(deployId)
       if (res.success) {
-        const detail = res.data as DeploymentDetail
+        const detail = res.data as any
         activeDetail.value = detail
+
+        // 提取 Agent 思考事件
+        if (detail.agent_thoughts) {
+          agentThoughts.value = detail.agent_thoughts
+        }
+        if (detail.fix_attempts) {
+          fixAttempts.value = detail.fix_attempts
+        }
+
+        // 处理审批状态
+        if (detail.needs_approval && !detail.approval_granted && detail.pending_diff) {
+          pendingDiff.value = detail.pending_diff
+          showDiffDialog.value = true
+        }
 
         // 检查是否结束
         if (detail.final_status !== 'running') {
           stopPolling()
           activeDeploymentId.value = null
-          ElMessage.success(`部署完成: ${statusLabel(detail.final_status)}`)
-          await fetchHistory() // 刷新列表
+          const status = statusLabel(detail.final_status)
+          if (detail.final_status === 'success') {
+            ElMessage.success(`部署完成`)
+          } else {
+            ElMessage.warning(`部署结束: ${status}`)
+          }
+          await fetchHistory()
         }
       }
     } catch {
@@ -195,6 +223,32 @@ async function handleCancel() {
   } catch {
     // 用户取消操作
   }
+}
+
+// ─── 审批 Agent 变更 ───
+async function handleApprove() {
+  if (!activeDeploymentId.value) return
+  approving.value = true
+  try {
+    const res = await approveDeployApi(activeDeploymentId.value)
+    if (res.code === 200 || res.success) {
+      ElMessage.success('已批准变更，继续部署')
+      showDiffDialog.value = false
+    } else {
+      ElMessage.error(res.errorMsg || '审批失败')
+    }
+  } catch {
+    ElMessage.error('审批请求失败')
+  } finally {
+    approving.value = false
+  }
+}
+
+// ─── 查看历史部署的 Agent 报告（Markdown -> HTML） ───
+function renderReport(detail: any): string {
+  const md = detail?.report || detail?.response || ''
+  if (!md) return ''
+  return marked.parse(md, { async: false }) as string
 }
 
 // ─── 查看详情 ───
@@ -317,6 +371,49 @@ onUnmounted(() => {
         <div v-for="(log, i) in activeDetail.logs" :key="i" class="leading-relaxed">
           <span class="text-gray-500">[{{ log.phase }}]</span> {{ log.message }}
         </div>
+      </div>
+
+      <!-- Agent 思考日志 -->
+      <div v-if="agentThoughts.length > 0" class="mt-3">
+        <el-collapse accordion>
+          <el-collapse-item title="🤖 AI Agent 诊断日志" name="agent-logs">
+            <div class="space-y-2 max-h-48 overflow-y-auto">
+              <div
+                v-for="(thought, i) in agentThoughts"
+                :key="i"
+                class="bg-indigo-50 border border-indigo-100 rounded-lg p-3 text-sm"
+              >
+                <div class="flex items-center gap-1 text-indigo-600 font-medium mb-1">
+                  <span class="text-indigo-500">◆</span>
+                  <span>AI 分析 ({{ thought.phase }})</span>
+                </div>
+                <p class="text-gray-600 text-xs whitespace-pre-wrap">{{ thought.content }}</p>
+                <div v-if="thought.detail" class="mt-1 text-gray-500 text-xs font-mono bg-white rounded p-2">
+                  {{ thought.detail }}
+                </div>
+                <div v-if="thought.plan" class="mt-1">
+                  <div v-for="(step, si) in thought.plan" :key="si" class="text-xs text-gray-500 flex items-center gap-1">
+                    <el-icon size="10"><Circle /></el-icon>
+                    {{ step }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </el-collapse-item>
+        </el-collapse>
+      </div>
+
+      <!-- 修复尝试记录 -->
+      <div v-if="fixAttempts.length > 0" class="mt-2 flex items-center gap-2">
+        <template v-for="(fix, i) in fixAttempts" :key="i">
+          <el-tag
+            :type="fix.attempt < fix.max_retries ? 'warning' : 'danger'"
+            size="small"
+            effect="light"
+          >
+            🔧 修复 #{{ fix.attempt }}/{{ fix.max_retries }}
+          </el-tag>
+        </template>
       </div>
     </div>
 
@@ -482,6 +579,33 @@ onUnmounted(() => {
       </template>
     </el-dialog>
 
+    <!-- ═══ Agent 变更审批弹窗 ═══ -->
+    <el-dialog
+      v-model="showDiffDialog"
+      title="AI Agent 代码变更审查"
+      width="700px"
+      :close-on-click-modal="false"
+      :before-close="(done: Function) => { if(!approving) done() }"
+    >
+      <div class="space-y-4">
+        <el-alert
+          title="Agent 在部署过程中修改了以下文件，请审查后再批准部署。"
+          type="warning"
+          :closable="false"
+          show-icon
+        />
+        <div class="bg-gray-900 text-green-400 rounded-lg p-4 font-mono text-xs max-h-96 overflow-y-auto">
+          <pre class="whitespace-pre-wrap">{{ pendingDiff || '无变更内容' }}</pre>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="showDiffDialog = false" :disabled="approving">拒绝部署</el-button>
+        <el-button type="primary" :loading="approving" @click="handleApprove">
+          {{ approving ? '批准中...' : '批准变更，继续部署' }}
+        </el-button>
+      </template>
+    </el-dialog>
+
     <!-- ═══ 部署详情抽屉 ═══ -->
     <el-drawer
       v-model="showDetailDrawer"
@@ -574,8 +698,45 @@ onUnmounted(() => {
             <h3 class="font-semibold text-red-700 mb-2">错误信息</h3>
             <pre class="text-sm text-red-600 whitespace-pre-wrap">{{ selectedDetail.error }}</pre>
           </div>
+
+          <!-- Agent 报告（Markdown 渲染） -->
+          <div v-if="renderReport(selectedDetail)" class="bg-gray-50 rounded-lg p-4">
+            <h3 class="font-semibold text-gray-700 mb-3">AI 部署报告</h3>
+            <div class="report-content text-sm text-gray-700 prose prose-sm max-w-none" v-html="renderReport(selectedDetail)"></div>
+          </div>
         </div>
       </template>
     </el-drawer>
   </div>
 </template>
+
+<style scoped>
+/* Markdown 渲染样式 */
+.report-content :deep(table) {
+  @apply w-full border-collapse my-2;
+  border: 1px solid #d1d5db;
+}
+.report-content :deep(th) {
+  @apply px-3 py-1.5 text-left font-semibold text-sm;
+  border: 1px solid #9ca3af;
+  background-color: #e5e7eb;
+}
+.report-content :deep(td) {
+  @apply px-3 py-1.5 text-sm;
+  border: 1px solid #d1d5db;
+}
+.report-content :deep(tr:nth-child(even)) {
+  background-color: #f9fafb;
+}
+.report-content :deep(code) {
+  font-size: 0.875rem;
+  @apply bg-gray-200/70 rounded px-1 py-0.5;
+}
+.report-content :deep(pre) {
+  @apply bg-gray-800 text-gray-100 rounded-lg p-3 my-2 overflow-x-auto;
+}
+.report-content :deep(pre code) {
+  @apply bg-transparent p-0 text-gray-100;
+  font-size: 0.875rem;
+}
+</style>
