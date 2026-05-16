@@ -23,10 +23,13 @@ RUN pip install --no-cache-dir \
 # 复制应用代码
 COPY agent/ .
 
-# 创建模型缓存目录并预下载重排模型（避免容器启动后首次推理卡死）
+# 设置 HuggingFace 镜像站（国内网络加速，用于构建时和运行时）
+ENV HF_ENDPOINT=https://hf-mirror.com
+
+# 构建时预下载重排模型（避免首次推理卡死）
 RUN mkdir -p .model_cache && \
     python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='BAAI/bge-reranker-v2-m3', local_dir='.model_cache/BAAI/bge-reranker-v2-m3', local_dir_use_symlinks=False)" && \
-    echo "Model downloaded successfully"
+    echo "Model downloaded successfully from hf-mirror.com"
 
 EXPOSE 8000
 
