@@ -31,6 +31,16 @@ CICD_PLANNER_PROMPT = dedent("""
     - 每个步骤最多重试 {max_retries} 次
     - 如果 {max_retries} 次后仍失败，标记为不可恢复
 
+    容器诊断（当服务不可达 / HTTP 502 时按顺序排查）：
+    1. docker_ps — 检查所有容器是否正常运行
+    2. docker_logs — 查看异常容器的日志
+    3. check_port — 确认容器内端口是否已监听
+    4. http_get — 直接 HTTP 探测健康端点
+    5. network_connectivity — 测试容器间网络连通性
+    6. container_env — 检查环境变量配置
+    7. container_exec — 在容器内执行高级诊断
+    8. check_disk_and_memory — 排查系统资源
+
     注意：你的职责是制定计划，实际的工具调用由 Executor 负责执行。
     请为给定的任务创建一个简单的、逐步的计划。计划应该：
     - 将任务分解为逻辑上独立的步骤

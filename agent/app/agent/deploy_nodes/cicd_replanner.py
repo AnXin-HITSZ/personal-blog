@@ -20,6 +20,9 @@ from app.agent.deploy_tools import (
     git_pull, npm_build, maven_build, docker_build,
     docker_deploy, health_check, get_git_diff,
     read_log, read_file, edit_file, run_command,
+    docker_ps, docker_logs, check_port, http_get,
+    container_env, container_exec, network_connectivity,
+    check_disk_and_memory,
 )
 from app.agent.aiops.utils import format_tools_description
 from ..deploy_state import CICDState
@@ -128,6 +131,9 @@ async def _decide_replan(state: CICDState) -> Dict[str, Any]:
             git_pull, npm_build, maven_build, docker_build,
             docker_deploy, health_check, get_git_diff,
             read_log, read_file, edit_file, run_command,
+            docker_ps, docker_logs, check_port, http_get,
+            container_env, container_exec, network_connectivity,
+            check_disk_and_memory,
         ]
         tools_description = format_tools_description(all_tools)
 
