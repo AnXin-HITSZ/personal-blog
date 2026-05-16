@@ -23,6 +23,11 @@ RUN pip install --no-cache-dir \
 # 复制应用代码
 COPY agent/ .
 
+# 创建模型缓存目录并预下载重排模型（避免容器启动后首次推理卡死）
+RUN mkdir -p .model_cache && \
+    python -c "from sentence_transformers import CrossEncoder; CrossEncoder('.model_cache/BAAI/bge-small-reranker-v2')" && \
+    echo "Model downloaded successfully"
+
 EXPOSE 8000
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
