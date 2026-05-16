@@ -8,8 +8,10 @@ COPY backend/pom.xml .
 COPY backend/src ./src
 COPY backend/.mvn ./.mvn
 COPY backend/mvnw .
+COPY backend/settings.xml /root/.m2/settings.xml
 
-RUN mvn clean package -DskipTests -B
+# 使用阿里云 Maven 镜像加速国内构建
+RUN mvn clean package -DskipTests -B -T 2C
 
 # ============================================
 # Stage 2: Run JAR with JRE
