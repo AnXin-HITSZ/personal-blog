@@ -192,9 +192,11 @@ docker compose up -d --build frontend  # 仅前端
 
 ### 优化背景
 
-在 RAG 流水线中，**BGE-Reranker-v2-M3**（568M 参数）作为 Cross-Encoder 对召回结果进行重排，确保检索质量。但重排阶段在 CPU 上推理延迟极高，且 PyTorch 占满所有 CPU 核心导致系统严重卡顿。
+在 RAG 流水线中，Cross-Encoder 重排模型对召回结果进行精细打分，确保检索质量。但重排阶段在 CPU 上推理延迟极高，且 PyTorch 占满所有 CPU 核心导致系统严重卡顿。
 
 ### 优化指标
+
+以下数据基于 **BGE-Reranker-v2-M3**（568M 参数）：
 
 | 指标 | 优化前 (v1.0.0) | 优化后 (v1.0.1) | 提升 |
 |------|:---:|:---:|:---:|
@@ -236,9 +238,25 @@ torch.set_num_threads(4)  # 从 20 → 4
 重排统计: 2 次调用 | 平均 14557ms | 最小 14203ms | 最大 14911ms | 吞吐 ~1.0 docs/s
 ```
 
-### 基准测试
+### 低内存部署
 
-短文本场景（15 pairs, 3 次取平均）：
+在 **1.6GB 内存服务器**等受限环境下，可切换为轻量级模型 **BGE-Small-Reranker-v2**（33M 参数，约 80MB）：
+
+| 模型 | 参数量 | 内存占用 | 推理速度 | 适用场景 |
+|:---|:---:|:---:|:---:|:---|
+| BGE-Reranker-v2-M3 ⬅ 默认 | 568M | ~800MB | 14.2s / 15 docs | 高性能服务器（≥4GB） |
+| **BGE-Small-Reranker-v2** | **33M** | **~80MB** | **~2s / 15 docs** | **低内存服务器（1-2GB）** |
+
+切换方式（`agent/app/config.py`）：
+```python
+# 高性能版
+rag_rerank_model = "BAAI/bge-reranker-v2-m3"
+
+# 低内存版（已预缓存）
+rag_rerank_model_path = ".model_cache/BAAI/bge-small-reranker-v2"
+```
+
+### 基准测试
 
 | 配置 | 推理耗时 | 相对提升 |
 |:---|:---:|:---:|

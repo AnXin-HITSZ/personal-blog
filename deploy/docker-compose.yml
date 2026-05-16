@@ -18,12 +18,19 @@ services:
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci
       --default-time-zone=+8:00
+      --innodb-buffer-pool-size=256M
+      --innodb-log-buffer-size=32M
+      --performance-schema=OFF
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   # ============================================
   # Redis（AI Agent 记忆存储）
@@ -42,6 +49,10 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
   # ============================================
   # Qdrant - 向量数据库
@@ -58,6 +69,10 @@ services:
     environment:
       QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:-}
       QDRANT__SERVICE__GRPC_PORT: 6334
+    deploy:
+      resources:
+        limits:
+          memory: 256M
 
   # ============================================
   # Backend - Spring Boot
@@ -82,6 +97,7 @@ services:
       FASTAPI_SERVICE_URL: http://agent:8000
       QDRANT_URL: http://qdrant:6333
       QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      JAVA_TOOL_OPTIONS: "-Xmx256m -Xms128m"
     depends_on:
       mysql:
         condition: service_healthy
@@ -89,6 +105,10 @@ services:
         condition: service_healthy
       qdrant:
         condition: service_started
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   # ============================================
   # Agent - FastAPI Python（AI 对话服务）
@@ -123,6 +143,10 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   # ============================================
   # Frontend - Nginx（前端静态文件 + 反向代理）
@@ -138,6 +162,10 @@ services:
     depends_on:
       - backend
       - agent
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
 volumes:
   mysql_data:
