@@ -25,7 +25,7 @@ COPY agent/ .
 
 # 创建模型缓存目录并预下载重排模型（避免容器启动后首次推理卡死）
 RUN mkdir -p .model_cache && \
-    python -c "from sentence_transformers import CrossEncoder; CrossEncoder('.model_cache/BAAI/bge-reranker-v2-m3')" && \
+    python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='BAAI/bge-reranker-v2-m3', local_dir='.model_cache/BAAI/bge-reranker-v2-m3', local_dir_use_symlinks=False)" && \
     echo "Model downloaded successfully"
 
 EXPOSE 8000
