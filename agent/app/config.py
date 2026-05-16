@@ -44,10 +44,8 @@ class Settings(BaseSettings):
     # RAG 重排配置（先召回后重排）
     rag_rerank_top_n: int = 15       # 第一阶段召回数量
     rag_final_top_k: int = 3         # 重排后保留数量
-    # 低内存服务器建议使用 bge-small-reranker-v2（33M 参数，~80MB）
-    # 高性能服务器可使用 bge-reranker-v2-m3（568M 参数，~800MB）
-    rag_rerank_model: str = "BAAI/bge-small-reranker-v2"
-    rag_rerank_model_path: str = ".model_cache/BAAI/bge-small-reranker-v2"
+    rag_rerank_model: str = "BAAI/bge-reranker-v2-m3"
+    rag_rerank_model_path: str = ".model_cache/BAAI/bge-reranker-v2-m3"
     rag_rerank_device: str = "cpu"
     rag_rerank_use_fp16: bool = False
     rag_rerank_quantize: bool = True
