@@ -23,13 +23,15 @@ RUN pip install --no-cache-dir \
 # 复制应用代码
 COPY agent/ .
 
-# 设置 HuggingFace 镜像站（国内网络加速，用于构建时和运行时）
+# 设置 HuggingFace 镜像站（运行时降级使用）
 ENV HF_ENDPOINT=https://hf-mirror.com
 
-# 构建时预下载重排模型（避免首次推理卡死）
-RUN mkdir -p .model_cache && \
-    python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='BAAI/bge-reranker-v2-m3', local_dir='.model_cache/BAAI/bge-reranker-v2-m3', local_dir_use_symlinks=False)" && \
-    echo "Model downloaded successfully from hf-mirror.com"
+# 构建时通过阿里云 ModelScope 预下载重排模型（国内网络友好）
+RUN pip install modelscope --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple && \
+    python -c "from modelscope.hub.snapshot_download import snapshot_download; snapshot_download('BAAI/bge-reranker-v2-m3', local_dir='.model_cache/BAAI/bge-reranker-v2-m3')" && \
+    echo "Model downloaded successfully from ModelScope" && \
+    pip uninstall modelscope -y && \
+    rm -rf /root/.cache/modelscope
 
 EXPOSE 8000
 
