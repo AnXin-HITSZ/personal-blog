@@ -391,7 +391,7 @@ function formatTime(isoStr: string): string {
       </div>
 
       <!-- Messages -->
-      <div v-else ref="messageList" class="flex-1 overflow-y-auto space-y-4 pr-2">
+      <div v-else ref="messageList" class="flex-1 overflow-y-auto overflow-x-hidden space-y-4">
         <!-- Tool call indicators -->
         <div v-if="toolCalls.length > 0" class="flex justify-start">
           <div class="flex items-start gap-2 max-w-[80%]">
@@ -436,7 +436,7 @@ function formatTime(isoStr: string): string {
                 msg.role === 'user'
                   ? 'bg-indigo-500 text-white rounded-2xl rounded-tr-md'
                   : 'bg-white border border-gray-100 text-gray-700 rounded-2xl rounded-tl-md',
-                'px-4 py-2.5 shadow-sm',
+                'px-4 py-2.5 shadow-sm min-w-0',
               ]"
             >
               <!-- Streaming waiting indicator -->

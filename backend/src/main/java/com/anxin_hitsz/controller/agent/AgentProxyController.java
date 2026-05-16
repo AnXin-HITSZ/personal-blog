@@ -149,6 +149,18 @@ public class AgentProxyController {
         return proxyPost("/api/agent/index_directory", request);
     }
 
+    // ──────────── Skill 管理 ────────────
+
+    @GetMapping("/skills")
+    public Result listSkills() {
+        return proxyGet("/api/agent/skills");
+    }
+
+    @PostMapping("/skills/configure")
+    public Result configureSkills(@RequestBody Map<String, Object> request) {
+        return proxyPost("/api/agent/skills/configure", request);
+    }
+
     // ──────────── 健康检查 ────────────
 
     @GetMapping("/health")

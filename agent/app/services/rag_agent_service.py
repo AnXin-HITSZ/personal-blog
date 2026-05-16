@@ -7,17 +7,18 @@
   不再使用 MemorySaver checkpointer，改为 query/query_stream 方法
   自行管理对话历史。历史消息通过 conversation_memory 持久化到 Redis，
   确保服务重启后会话不丢失，同时避免 tool 消息污染发送给 LLM 的消息列表。
+
+记忆系统：
+  - MemoryOrchestrator 管理上下文组装 + 压缩 + 语义提取
+  - SkillRegistry 管理工具和 system prompt 的动态拼装
 """
 
-from typing import Any, AsyncGenerator, Dict
+import asyncio
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from langchain.agents import create_agent
 from langchain_core.messages import (
-    AIMessage,
     AIMessageChunk,
-    BaseMessage,
-    HumanMessage,
-    SystemMessage,
     ToolMessage,
 )
 from loguru import logger
@@ -25,7 +26,8 @@ from langchain_openai import ChatOpenAI
 
 from app.config import config
 from app.services.conversation_memory import conversation_memory
-from app.tools import get_current_time, retrieve_knowledge
+from app.services.memory_orchestrator import memory_orchestrator
+from app.core.skill_registry import skill_registry
 from app.agent.mcp_client import get_mcp_client_with_retry
 
 
@@ -39,7 +41,7 @@ class RagAgentService:
             streaming: 是否启用流式输出，默认为 True
         """
         self.streaming = streaming
-        self.system_prompt = self._build_system_prompt()
+        self.enabled_skills: Optional[List[str]] = None
 
         self.model = ChatOpenAI(
             model=config.llm_model_id,
@@ -49,10 +51,8 @@ class RagAgentService:
             streaming=streaming,
         )
 
-        # 定义基础工具
-        self.tools = [retrieve_knowledge, get_current_time]
-
-        # Agent 实例（延迟初始化）
+        # system_prompt 和 agent 在 _initialize_agent 中动态构建
+        self.system_prompt = self._build_system_prompt("")
         self.agent = None
         self._agent_initialized = False
 
@@ -61,45 +61,35 @@ class RagAgentService:
             f"model={config.llm_model_id}, streaming={streaming}"
         )
 
-    async def _initialize_agent(self):
-        """异步初始化 Agent（包括 MCP 工具）"""
-        if self._agent_initialized:
-            return
+    def _load_enabled_skills(self) -> List[str]:
+        """加载启用的 Skill 列表
 
-        # 尝加载 MCP 工具（非关键路径，失败不阻塞）
-        try:
-            mcp_client = await get_mcp_client_with_retry()
-            mcp_tools = await mcp_client.get_tools()
-            logger.info(f"成功加载 {len(mcp_tools)} 个 MCP 工具")
-        except Exception as e:
-            logger.warning(f"MCP 工具加载失败，仅使用内置工具: {e}")
-            mcp_tools = []
+        优先级：
+        1. self.enabled_skills（通过 reinitialize() 或首次设置）
+        2. config.default_enabled_skills
 
-        # 合并所有工具
-        all_tools = self.tools + (mcp_tools if mcp_tools else [])
+        Returns:
+            List[str]: 启用的 Skill 名称列表
+        """
+        if self.enabled_skills is not None:
+            return self.enabled_skills
 
-        # 注意：不传 checkpointer，每轮 Agent 调用独立。
-        # 历史消息由 conversation_memory (Redis) 管理，在调用前拼接到 messages 中。
-        self.agent = create_agent(
-            self.model,
-            tools=all_tools,
-            checkpointer=None,
-        )
+        # 从配置解析默认启用的 Skill
+        default = config.default_enabled_skills
+        return [s.strip() for s in default.split(",") if s.strip()]
 
-        self._agent_initialized = True
+    def _build_system_prompt(self, skill_extensions: str = "") -> str:
+        """构建系统提示词
 
-        if all_tools:
-            tool_names = [
-                tool.name if hasattr(tool, "name") else str(tool)
-                for tool in all_tools
-            ]
-            logger.info(f"可用工具列表: {', '.join(tool_names)}")
+        Args:
+            skill_extensions: Skill system_prompt_fragment 的拼接文本
 
-    def _build_system_prompt(self) -> str:
-        """构建系统提示词"""
+        Returns:
+            str: 完整的系统提示词
+        """
         from textwrap import dedent
 
-        return dedent("""
+        base = dedent("""
             你是一个专业的AI助手，能够使用多种工具来帮助用户解决问题。
 
             工作原则:
@@ -117,34 +107,93 @@ class RagAgentService:
             请根据用户的问题，灵活使用可用工具，提供高质量的帮助。
         """).strip()
 
+        if skill_extensions:
+            base += f"\n\n## 可用能力\n\n{skill_extensions}"
+
+        return base
+
+    async def _initialize_agent(self):
+        """异步初始化 Agent（从 SkillRegistry 动态加载工具）"""
+        if self._agent_initialized:
+            return
+
+        # 1. 获取启用的 Skill 列表
+        enabled = self._load_enabled_skills()
+        logger.info(f"初始化 Agent，启用的 Skill: {enabled}")
+
+        # 2. 从 SkillRegistry 获取工具
+        all_tools = skill_registry.get_enabled_tools(enabled)
+
+        # 3. 尝试加载 MCP 工具，填充到 mcp Skill
+        try:
+            mcp_client = await get_mcp_client_with_retry()
+            mcp_tools = await mcp_client.get_tools()
+            if mcp_tools:
+                # 将 MCP 工具追加到工具列表（它们不属于 SkillRegistry 的静态注册）
+                all_tools = all_tools + mcp_tools
+                logger.info(f"成功加载 {len(mcp_tools)} 个 MCP 工具")
+        except Exception as e:
+            logger.warning(f"MCP 工具加载失败: {e}")
+
+        # 4. 获取 Skill 的 system prompt 扩展
+        skill_extensions = skill_registry.get_system_prompt_extensions(enabled)
+        self.system_prompt = self._build_system_prompt(skill_extensions)
+
+        # 5. 创建 Agent
+        self.agent = create_agent(
+            self.model,
+            tools=all_tools,
+            checkpointer=None,
+        )
+
+        self._agent_initialized = True
+
+        if all_tools:
+            tool_names = [
+                tool.name if hasattr(tool, "name") else str(tool)
+                for tool in all_tools
+            ]
+            logger.info(f"Agent 初始化完成，可用工具 ({len(all_tools)}): {', '.join(tool_names)}")
+        else:
+            logger.warning("Agent 初始化完成，但无可用工具（纯文本模式）")
+
+    async def reinitialize(self, enabled_skills: Optional[List[str]] = None) -> None:
+        """热插拔：重新初始化 Agent
+
+        设置新的 Skill 启用状态并标记为未初始化。
+        不中断当前正在进行的对话，仅影响下一轮请求。
+
+        Args:
+            enabled_skills: 新的 Skill 启用列表，None 表示使用配置默认值
+        """
+        if enabled_skills is not None:
+            self.enabled_skills = enabled_skills
+        else:
+            self.enabled_skills = None  # 回退到默认配置
+
+        self._agent_initialized = False
+        logger.info(f"Agent 已标记为重新初始化，启用 Skill: {self.enabled_skills or '默认'}")
+
     async def _build_messages_with_history(
         self, question: str, session_id: str
-    ) -> list[BaseMessage]:
+    ) -> list:
         """从 Redis 加载历史消息并构建完整的 messages 列表。
+
+        委托给 MemoryOrchestrator 组装：
+        SystemPrompt + 语义记忆 + 对话摘要 + 最近消息 + 当前问题
 
         Args:
             question: 用户当前问题
             session_id: 会话 ID
 
         Returns:
-            list[BaseMessage]: System + 历史对话 + 当前问题
+            list[BaseMessage]: 完整的消息列表
         """
-        history = await conversation_memory.get_messages(session_id)
-
-        messages: list[BaseMessage] = [
-            SystemMessage(content=self.system_prompt)
-        ]
-
-        for msg in history:
-            role = msg.get("role", "")
-            content = msg.get("content", "")
-            if role == "user":
-                messages.append(HumanMessage(content=content))
-            elif role == "assistant":
-                messages.append(AIMessage(content=content))
-
-        messages.append(HumanMessage(content=question))
-        return messages
+        return await memory_orchestrator.build_context_messages(
+            base_system_prompt=self.system_prompt,
+            session_id=session_id,
+            question=question,
+        )
 
     async def query(self, question: str, session_id: str) -> str:
         """非流式处理用户问题（一次性返回完整答案）
@@ -161,7 +210,7 @@ class RagAgentService:
 
             logger.info(f"[会话 {session_id}] RAG Agent 收到查询（非流式）: {question}")
 
-            # 1. 从 Redis 加载历史消息，构建完整消息列表
+            # 1. 从 Redis 加载历史消息（含语义记忆 + 摘要），构建完整消息列表
             messages = await self._build_messages_with_history(question, session_id)
 
             # 2. 调用 Agent（无 checkpointer，单轮独立）
@@ -185,6 +234,11 @@ class RagAgentService:
             await conversation_memory.add_message(session_id, "user", question)
             if answer:
                 await conversation_memory.add_message(session_id, "assistant", answer)
+
+            # 5. 记忆维护（压缩检查 + 语义提取）
+            await memory_orchestrator.run_post_turn_maintenance(
+                session_id, question, answer, self.model
+            )
 
             return answer
 
@@ -213,7 +267,7 @@ class RagAgentService:
 
             logger.info(f"[会话 {session_id}] RAG Agent 收到查询（流式）: {question}")
 
-            # 1. 从 Redis 加载历史消息，构建完整消息列表
+            # 1. 从 Redis 加载历史消息（含语义记忆 + 摘要），构建完整消息列表
             messages = await self._build_messages_with_history(question, session_id)
 
             # 2. 流式调用 Agent
@@ -272,6 +326,17 @@ class RagAgentService:
 
             yield {"type": "complete"}
 
+            # 4. 记忆维护（后台任务：压缩检查 + 语义提取）
+            # SSE 流已结束后执行，不影响客户端感知的响应时间
+            asyncio.create_task(
+                memory_orchestrator.run_post_turn_maintenance(
+                    session_id,
+                    question,
+                    content_accumulator,
+                    self.model,
+                )
+            )
+
         except Exception as e:
             logger.error(f"[会话 {session_id}] RAG Agent 查询失败（流式）: {e}")
             yield {"type": "error", "data": str(e)}
@@ -302,7 +367,6 @@ class RagAgentService:
     def get_message_count(self, session_id: str) -> int:
         """获取会话消息数量（仅用于回退，不抛异常）"""
         try:
-            import asyncio
             return asyncio.run(conversation_memory.get_message_count(session_id))
         except Exception:
             return 0

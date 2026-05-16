@@ -31,10 +31,10 @@ async function handleLogin() {
     if (res.success) {
       store.setToken(res.data as string)
       await store.fetchUserInfo()
-      ElMessage.success('登录成功')
+      ElMessage.success({ message: '登录成功', duration: 2000 })
       router.push('/')
     } else {
-      ElMessage.error(res.errorMsg || '登录失败')
+      ElMessage.error({ message: res.errorMsg || '登录失败', duration: 2000 })
     }
   } catch {
     // handled by interceptor
@@ -60,7 +60,7 @@ async function handleLogin() {
 
         <!-- Form -->
         <el-form @submit.prevent="handleLogin" class="space-y-5">
-          <el-form-item label="用户名" class="!mb-0">
+          <el-form-item label="用户名" label-width="80px" class="!mb-0">
             <el-input
               v-model="form.username"
               placeholder="请输入用户名"
@@ -71,7 +71,7 @@ async function handleLogin() {
             />
           </el-form-item>
 
-          <el-form-item label="密码" class="!mb-0">
+          <el-form-item label="密码" label-width="80px" class="!mb-0">
             <el-input
               v-model="form.password"
               type="password"

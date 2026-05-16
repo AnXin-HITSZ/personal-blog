@@ -33,6 +33,11 @@ def _metadata_key(session_id: str) -> str:
     return f"{SESSION_PREFIX}:{session_id}:metadata"
 
 
+def _summary_key(session_id: str) -> str:
+    """会话摘要的 Redis key"""
+    return f"{SESSION_PREFIX}:{session_id}:summary"
+
+
 class ConversationMemory:
     """对话记忆服务 - Redis 持久化存储"""
 
@@ -145,6 +150,7 @@ class ConversationMemory:
             redis = await self._get_redis()
             await redis.delete(_messages_key(session_id))
             await redis.delete(_metadata_key(session_id))
+            await redis.delete(_summary_key(session_id))
             logger.info(f"已清除会话: {session_id}")
             return True
 
@@ -168,6 +174,118 @@ class ConversationMemory:
             return count or 0
         except Exception:
             return 0
+
+    # ─── 摘要压缩相关 ───
+
+    async def save_summary(self, session_id: str, summary_text: str) -> None:
+        """
+        保存/更新会话摘要
+
+        Args:
+            session_id: 会话 ID
+            summary_text: 摘要文本
+        """
+        try:
+            redis = await self._get_redis()
+            await redis.set(_summary_key(session_id), summary_text)
+        except Exception as e:
+            logger.warning(f"保存会话摘要失败: {session_id}, 错误: {e}")
+
+    async def get_summary(self, session_id: str) -> Optional[str]:
+        """
+        获取会话摘要（如果存在）
+
+        Args:
+            session_id: 会话 ID
+
+        Returns:
+            Optional[str]: 摘要文本，不存在则返回 None
+        """
+        try:
+            redis = await self._get_redis()
+            summary = await redis.get(_summary_key(session_id))
+            return summary if summary else None
+        except Exception as e:
+            logger.warning(f"获取会话摘要失败: {session_id}, 错误: {e}")
+            return None
+
+    async def clear_summary(self, session_id: str) -> bool:
+        """
+        清除会话摘要
+
+        Args:
+            session_id: 会话 ID
+
+        Returns:
+            bool: 是否成功
+        """
+        try:
+            redis = await self._get_redis()
+            await redis.delete(_summary_key(session_id))
+            return True
+        except Exception as e:
+            logger.warning(f"清除会话摘要失败: {session_id}, 错误: {e}")
+            return False
+
+    async def trim_messages(self, session_id: str, keep_count: int) -> int:
+        """
+        裁剪消息列表，只保留最近 N 条消息
+
+        Args:
+            session_id: 会话 ID
+            keep_count: 保留的消息条数
+
+        Returns:
+            int: 裁剪后的消息数量
+        """
+        try:
+            redis = await self._get_redis()
+            key = _messages_key(session_id)
+
+            # LTRIM 保留最后 keep_count 条
+            await redis.ltrim(key, -keep_count, -1)
+
+            new_count = await redis.llen(key)
+            # 更新元数据中的 message_count
+            meta_key = _metadata_key(session_id)
+            await redis.hset(meta_key, "message_count", new_count)
+
+            logger.info(f"会话 {session_id} 消息已裁剪，保留 {new_count} 条")
+            return new_count
+        except Exception as e:
+            logger.warning(f"裁剪消息失败: {session_id}, 错误: {e}")
+            return 0
+
+    async def get_messages_range(
+        self, session_id: str, start: int, end: int
+    ) -> List[Dict[str, Any]]:
+        """
+        获取指定范围内的消息
+
+        Args:
+            session_id: 会话 ID
+            start: 起始索引（0-based）
+            end: 结束索引（包含，-1 表示到最后）
+
+        Returns:
+            List[Dict]: 消息列表
+        """
+        try:
+            redis = await self._get_redis()
+            key = _messages_key(session_id)
+
+            items = await redis.lrange(key, start, end)
+            messages = []
+            for item in items:
+                try:
+                    messages.append(json.loads(item))
+                except json.JSONDecodeError:
+                    continue
+
+            return messages
+        except Exception as e:
+            logger.warning(f"获取消息范围失败: {session_id}, 错误: {e}")
+            return []
 
     async def _get_metadata(self, session_id: str) -> Dict[str, str]:
         """获取会话元数据"""

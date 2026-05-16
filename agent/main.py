@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 from app.config import config
-from app.api import file, rag, chat, deployment
+from app.api import file, rag, chat, deployment, skill
 
 
 @asynccontextmanager
@@ -41,6 +41,10 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Redis 连接失败: {e}")
         logger.warning("Redis 不可用，对话历史将不会持久化")
+
+    # 注册默认 Skill
+    from app.core.skill_registry import skill_registry
+    skill_registry.register_default_skills()
 
     logger.info("=" * 60)
 
@@ -72,6 +76,7 @@ app.add_middleware(
 app.include_router(file.router, prefix="/api/agent", tags=["文件管理"])
 app.include_router(rag.router, prefix="/api/agent", tags=["RAG 搜索"])
 app.include_router(chat.router, prefix="/api/agent", tags=["对话"])
+app.include_router(skill.router, prefix="/api/agent", tags=["Skill 管理"])
 app.include_router(deployment.router, prefix="/api/agent", tags=["部署"])
 
 

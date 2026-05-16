@@ -14,6 +14,7 @@ const menuItems = computed(() => {
   ]
   if (store.isLoggedIn) {
     items.push({ label: '知识库', path: '/admin/knowledge-base', icon: 'Collection' })
+    items.push({ label: 'SKILL', path: '/admin/skills', icon: 'MagicStick' })
     items.push({ label: '部署', path: '/admin/deploy', icon: 'Upload' })
     items.push({ label: '管理后台', path: '/admin', icon: 'Setting' })
   }
@@ -70,7 +71,7 @@ function handleLogout() {
               <el-button text class="!h-9">登录</el-button>
             </router-link>
             <router-link to="/register">
-              <el-button size="small" type="primary">注册</el-button>
+              <el-button size="small" plain>注册</el-button>
             </router-link>
           </template>
         </div>

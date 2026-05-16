@@ -81,6 +81,21 @@ export async function getRagStatsApi(): Promise<ApiResult> {
   return request.get(`${BASE}/rag/stats`).then((r) => r.data)
 }
 
+/** 获取所有 Skill 及当前启用状态 */
+export async function getSkillsApi(): Promise<ApiResult<{
+  skills: { name: string; description: string; tool_count: number; enabled_by_default: boolean }[]
+  enabled: string[]
+}>> {
+  return request.get(`${BASE}/skills`).then((r) => r.data)
+}
+
+/** 配置启用/禁用的 Skill 列表 */
+export async function configureSkillsApi(enabledSkills: string[]): Promise<ApiResult> {
+  return request
+    .post(`${BASE}/skills/configure`, { enabled_skills: enabledSkills })
+    .then((r) => r.data)
+}
+
 /**
  * 流式对话 — 使用 fetch 读取 SSE 事件流
  *

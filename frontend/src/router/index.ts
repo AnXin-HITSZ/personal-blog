@@ -53,6 +53,12 @@ const router = createRouter({
       component: () => import('@/views/admin/DeployDashboard.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/admin/skills',
+      name: 'SkillManager',
+      component: () => import('@/views/admin/SkillManager.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 

@@ -24,12 +24,20 @@ request.interceptors.request.use((config) => {
 request.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401 || err.response?.status === 403) {
+    const url = err.config?.url ?? ''
+    const isAuthPath = ['/user/account/login', '/user/account/register'].some((p) =>
+      url.startsWith(p),
+    )
+    const isAgentPath = url.startsWith('/api/agent/')
+
+    // 仅对用户认证接口的 401/403 做登出重定向
+    // Agent 接口的 401 可能是代理链路问题，不应注销用户
+    if (!isAuthPath && !isAgentPath && (err.response?.status === 401 || err.response?.status === 403)) {
       localStorage.removeItem('token')
-      ElMessage.error('登录已过期，请重新登录')
+      ElMessage.error({ message: '登录已过期，请重新登录', duration: 2000 })
       router.push('/login')
     } else {
-      ElMessage.error(err.response?.data?.errorMsg || err.message || '请求失败')
+      ElMessage.error({ message: err.response?.data?.errorMsg || err.message || '请求失败', duration: 2000 })
     }
     return Promise.reject(err)
   },

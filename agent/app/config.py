@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     # 应用配置
     app_name: str = "SuperBizAgent"
-    app_version: str = "1.0.0"
+    app_version: str = "1.0.1"
     debug: bool = False
     host: str = "0.0.0.0"
     port: int = 9900
@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     rag_rerank_model_path: str = ".model_cache/BAAI/bge-reranker-v2-m3"
     rag_rerank_device: str = "cpu"
     rag_rerank_use_fp16: bool = False
+    rag_rerank_quantize: bool = True
 
     # 文档分块配置
     chunk_max_size: int = 800
@@ -55,6 +56,20 @@ class Settings(BaseSettings):
 
     # Redis 配置（对话记忆持久化）
     redis_url: str = "redis://localhost:6379/0"
+
+    # ─── 记忆与压缩配置 ───
+    memory_max_message_pairs: int = 50             # 最大消息对数（总条数 = pairs * 2），超过阈值触发压缩
+    memory_summary_threshold_ratio: float = 0.7    # 压缩触发阈值比例（达到 max_messages 的 70% 触发）
+    memory_keep_ratio: float = 0.4                 # 压缩后保留的消息比例（40% = 保留最近的消息）
+    memory_summary_max_words: int = 200            # 生成的摘要最大词数
+
+    # ─── 语义记忆配置 ───
+    semantic_memory_enabled: bool = True           # 是否启用语义记忆
+    semantic_memory_importance_threshold: float = 5.0  # 重要性评分阈值（0-10），>= 此值才存储
+    semantic_memory_max_facts: int = 100           # 语义记忆最大事实数
+
+    # ─── Skill 配置 ───
+    default_enabled_skills: str = "rag,time,mcp"   # 默认启用的 Skill（逗号分隔）
 
     # MCP 服务配置
     mcp_cls_transport: str = "streamable-http"

@@ -40,10 +40,10 @@ async function handleRegister() {
   try {
     const res = await registerApi(form)
     if (res.success) {
-      ElMessage.success('注册成功，请登录')
+      ElMessage.success({ message: '注册成功，请登录', duration: 2000 })
       router.push('/login')
     } else {
-      ElMessage.error(res.errorMsg || '注册失败')
+      ElMessage.error({ message: res.errorMsg || '注册失败', duration: 2000 })
     }
   } catch {
     // handled by interceptor
@@ -68,7 +68,7 @@ async function handleRegister() {
 
         <!-- Form -->
         <el-form @submit.prevent="handleRegister" class="space-y-5">
-          <el-form-item label="用户名" class="!mb-0">
+          <el-form-item label="用户名" label-width="80px" class="!mb-0">
             <el-input
               v-model="form.username"
               placeholder="请输入用户名"
@@ -79,7 +79,7 @@ async function handleRegister() {
             />
           </el-form-item>
 
-          <el-form-item label="密码" class="!mb-0">
+          <el-form-item label="密码" label-width="80px" class="!mb-0">
             <el-input
               v-model="form.password"
               type="password"
@@ -91,7 +91,7 @@ async function handleRegister() {
             />
           </el-form-item>
 
-          <el-form-item label="确认密码" class="!mb-0">
+          <el-form-item label="确认密码" label-width="80px" class="!mb-0">
             <el-input
               v-model="form.confirmedPassword"
               type="password"
