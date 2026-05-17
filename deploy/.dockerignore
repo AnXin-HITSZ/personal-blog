@@ -1,0 +1,46 @@
+# ============================================
+# Docker 构建上下文忽略规则
+# ============================================
+
+# 本地模型缓存（避免复制到构建上下文）
+agent/.model_cache/
+**/.model_cache/
+
+# Python
+agent/__pycache__/
+agent/**/__pycache__/
+agent/*.pyc
+agent/.venv/
+agent/venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitattributes
+
+# 环境文件
+agent/.env
+backend/.env
+
+# 构建产物
+backend/target/
+backend/*.jar
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 日志
+agent/logs/
+*.log
+
+# docker 构建缓存
+.dockerignore

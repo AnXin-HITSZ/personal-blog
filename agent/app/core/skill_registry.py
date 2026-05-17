@@ -134,7 +134,15 @@ class SkillRegistry:
 
     def register_default_skills(self) -> None:
         """注册内置默认 Skill"""
-        from app.tools import retrieve_knowledge, get_current_time
+        from app.tools import (
+            retrieve_knowledge, get_current_time,
+            get_article_stats, search_articles_db, get_recent_articles_db,
+            get_article_detail, get_user_stats, execute_read_query,
+            get_system_info, get_cpu_usage, get_memory_usage,
+            get_disk_usage, get_process_stats,
+            get_git_log, get_git_status, get_git_branch,
+            get_git_diff, get_git_commit_detail,
+        )
 
         self.register(Skill(
             name="rag",
@@ -160,11 +168,56 @@ class SkillRegistry:
         ))
 
         self.register(Skill(
+            name="database",
+            description="从 MySQL 数据库查询文章和用户数据",
+            tools=[
+                get_article_stats, search_articles_db, get_recent_articles_db,
+                get_article_detail, get_user_stats, execute_read_query,
+            ],
+            enabled_by_default=True,
+            system_prompt_fragment=(
+                "你可以直接查询博客的 MySQL 数据库来获取实时的文章和用户数据。"
+                "当用户询问文章数量、文章列表、用户统计、数据库查询等需要精确数据的问题时，"
+                "应使用 database 相关工具从数据库查询。"
+            ),
+        ))
+
+        self.register(Skill(
+            name="monitor",
+            description="系统监控：CPU、内存、磁盘、进程等信息",
+            tools=[
+                get_system_info, get_cpu_usage, get_memory_usage,
+                get_disk_usage, get_process_stats,
+            ],
+            enabled_by_default=True,
+            system_prompt_fragment=(
+                "你可以获取服务器的系统状态信息，包括 CPU 使用率、内存占用、"
+                "磁盘空间、进程统计等。当用户询问服务器状态、系统负载等问题时，"
+                "应使用 monitor 相关工具获取实时数据。"
+            ),
+        ))
+
+        self.register(Skill(
+            name="git",
+            description="Git 仓库操作：提交记录、分支、差异对比等",
+            tools=[
+                get_git_log, get_git_status, get_git_branch,
+                get_git_diff, get_git_commit_detail,
+            ],
+            enabled_by_default=False,  # 按需启用
+            system_prompt_fragment=(
+                "你可以查看项目的 Git 仓库信息，包括提交历史、分支状态、文件差异等。"
+                "当用户询问代码变更、提交记录、分支信息等问题时，"
+                "应使用 git 相关工具查询 Git 仓库。"
+            ),
+        ))
+
+        self.register(Skill(
             name="mcp",
-            description="外部 MCP 服务集成，提供监控告警和系统指标等信息",
+            description="外部 MCP 服务集成（日志服务等）",
             tools=[],  # 工具在初始化时动态填充
             system_prompt_fragment=(
-                "你可以调用外部 MCP 服务来获取监控告警、系统指标等信息。"
+                "你可以调用外部 MCP 服务来获取外部系统数据。"
                 "MCP 工具会自动可用。"
             ),
         ))

@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     semantic_memory_max_facts: int = 100           # 语义记忆最大事实数
 
     # ─── Skill 配置 ───
-    default_enabled_skills: str = "rag,time,mcp"   # 默认启用的 Skill（逗号分隔）
+    default_enabled_skills: str = "rag,time,database,monitor,mcp"   # 默认启用的 Skill（逗号分隔）
 
     # MCP 服务配置
     mcp_cls_transport: str = "streamable-http"
@@ -98,7 +98,7 @@ class Settings(BaseSettings):
             "monitor": {
                 "transport": self.mcp_monitor_transport,
                 "url": self.mcp_monitor_url,
-            }
+            },
         }
 
 
