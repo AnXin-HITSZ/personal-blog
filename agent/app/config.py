@@ -35,6 +35,7 @@ class Settings(BaseSettings):
 
     # Qdrant 配置
     qdrant_url: str = "http://localhost:6333"
+    qdrant_api_key: str = ""
     qdrant_collection: str = "biz"
 
     # RAG 配置

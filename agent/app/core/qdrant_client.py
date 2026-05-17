@@ -39,7 +39,11 @@ class QdrantClientManager:
         try:
             logger.info(f"正在连接到 Qdrant: {config.qdrant_url}")
 
-            self._client = QdrantClient(url=config.qdrant_url, timeout=30)
+            self._client = QdrantClient(
+                url=config.qdrant_url,
+                api_key=config.qdrant_api_key or "",
+                timeout=30,
+            )
 
             # 检查健康状态
             health = self._client.get_collections()

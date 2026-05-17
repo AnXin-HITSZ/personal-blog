@@ -15,16 +15,18 @@ COLLECTION_NAME = "biz"
 
 
 class VectorStoreManager:
-    """向量存储管理器"""
+    """向量存储管理器（懒初始化）"""
 
     def __init__(self):
         """初始化向量存储管理器"""
         self.vector_store = None
         self.collection_name = COLLECTION_NAME
-        self._initialize_vector_store()
+        self._initialized = False
 
-    def _initialize_vector_store(self):
-        """初始化 Qdrant VectorStore"""
+    def _ensure_initialized(self):
+        """确保已初始化（懒加载）"""
+        if self._initialized:
+            return
         try:
             _ = qdrant_manager.connect()
 
@@ -39,6 +41,7 @@ class VectorStoreManager:
                 f"VectorStore 初始化成功: {config.qdrant_url}, "
                 f"collection: {self.collection_name}"
             )
+            self._initialized = True
 
         except Exception as e:
             logger.error(f"VectorStore 初始化失败: {e}")
@@ -54,6 +57,7 @@ class VectorStoreManager:
         Returns:
             List[str]: 文档 ID 列表
         """
+        self._ensure_initialized()
         try:
             import time
             import uuid
@@ -87,6 +91,7 @@ class VectorStoreManager:
         try:
             from pathlib import Path
 
+            self._ensure_initialized()
             client = qdrant_manager.get_client()
             from qdrant_client.http.models import Filter, FieldCondition, MatchValue
 
@@ -124,6 +129,7 @@ class VectorStoreManager:
         Returns:
             Qdrant: VectorStore 实例
         """
+        self._ensure_initialized()
         return self.vector_store
 
 
