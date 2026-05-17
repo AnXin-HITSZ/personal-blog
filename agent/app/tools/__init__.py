@@ -24,6 +24,7 @@ from app.tools.git_tools import (
     get_git_diff,
     get_git_commit_detail,
 )
+from app.tools.blog_tools import publish_article
 
 __all__ = [
     "retrieve_knowledge",
@@ -47,4 +48,6 @@ __all__ = [
     "get_git_branch",
     "get_git_diff",
     "get_git_commit_detail",
+    # blog
+    "publish_article",
 ]

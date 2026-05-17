@@ -132,6 +132,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       REDIS_HOST: redis
       REDIS_PORT: "6379"
+      # 后端服务配置（博客发布等内部调用）
+      BACKEND_BASE_URL: http://backend:8080
       # 部署流水线配置
       DEPLOY_WORK_DIR: /data/deploy
       DEPLOY_REPO_URL: ${DEPLOY_REPO_URL:-}

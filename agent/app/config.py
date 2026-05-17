@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     semantic_memory_max_facts: int = 100           # 语义记忆最大事实数
 
     # ─── Skill 配置 ───
-    default_enabled_skills: str = "rag,time,database,monitor,mcp"   # 默认启用的 Skill（逗号分隔）
+    default_enabled_skills: str = "rag,time,database,monitor,blog,mcp"   # 默认启用的 Skill（逗号分隔）
 
     # MCP 服务配置
     mcp_cls_transport: str = "streamable-http"
@@ -85,7 +85,11 @@ class Settings(BaseSettings):
     deploy_notification_email: str = ""                 # 通知邮箱
     deploy_health_check_retries: int = 6                # 健康检查重试次数
     deploy_health_check_interval: int = 10              # 健康检查间隔（秒）
-    deploy_base_url: str = "http://localhost"           # 验证阶段基础 URL（Docker 用 80，本地可用 8000）
+    deploy_base_url: str = "http://localhost"           # 验证阶段基础 URL
+
+    # ─── 后端服务配置（博客发布等内部调用） ───
+    backend_base_url: str = "http://localhost:8080"     # Spring Boot 后端地址
+    internal_api_key: str = ""                          # 内部服务认证 Key
 
     @property
     def mcp_servers(self) -> Dict[str, Dict[str, Any]]:

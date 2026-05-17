@@ -45,7 +45,6 @@ const sending = ref(false)
 const streaming = ref(false)
 const inputText = ref('')
 const messageList = ref<HTMLElement | null>(null)
-const toolCalls = ref<ToolCallEvent[]>([])
 const sessionsLoading = ref(true)
 
 // ─── 加载会话列表 ───
@@ -167,21 +166,19 @@ async function scrollToBottom() {
 watch(messages, scrollToBottom, { deep: true })
 
 // ─── 工具调用管理 ───
-function handleToolCall(event: ToolCallEvent) {
+function handleToolCall(event: ToolCallEvent, msg: ChatMessage) {
   if (event.status === 'start') {
-    const existing = toolCalls.value.find(t => t.name === event.name && t.status === 'start')
+    const existing = (msg.toolCalls ?? []).find(t => t.name === event.name && t.status === 'start')
     if (!existing) {
-      toolCalls.value.push({ name: event.name, status: 'start' })
+      if (!msg.toolCalls) msg.toolCalls = []
+      msg.toolCalls.push({ name: event.name, status: 'start' })
     }
   } else if (event.status === 'end') {
-    const idx = toolCalls.value.findIndex(t => t.name === event.name && t.status === 'start')
-    if (idx !== -1) {
-      toolCalls.value[idx].status = 'end'
-      toolCalls.value[idx].result = event.result
+    const idx = (msg.toolCalls ?? []).findIndex(t => t.name === event.name && t.status === 'start')
+    if (idx !== -1 && msg.toolCalls) {
+      msg.toolCalls[idx].status = 'end'
+      msg.toolCalls[idx].result = event.result
     }
-    setTimeout(() => {
-      toolCalls.value = toolCalls.value.filter(t => t.status === 'start')
-    }, 1500)
   }
 }
 
@@ -189,6 +186,23 @@ function describeTool(name: string): string {
   const map: Record<string, string> = {
     retrieve_knowledge: '检索知识库',
     get_current_time: '获取当前时间',
+    get_article_stats: '文章统计',
+    search_articles_db: '搜索文章',
+    get_recent_articles_db: '最近文章',
+    get_article_detail: '文章详情',
+    get_user_stats: '用户统计',
+    execute_read_query: '数据库查询',
+    get_system_info: '系统信息',
+    get_cpu_usage: 'CPU 使用率',
+    get_memory_usage: '内存使用率',
+    get_disk_usage: '磁盘使用率',
+    get_process_stats: '进程统计',
+    get_git_log: 'Git 提交历史',
+    get_git_status: 'Git 状态',
+    get_git_branch: 'Git 分支',
+    get_git_diff: 'Git 差异',
+    get_git_commit_detail: 'Git 提交详情',
+    publish_article: '发布文章',
   }
   return map[name] || name
 }
@@ -201,7 +215,7 @@ async function sendMessage() {
   inputText.value = ''
   messages.value.push({ role: 'user', content: text })
 
-  const assistantMsg: ChatMessage = { role: 'assistant', content: '' }
+  const assistantMsg: ChatMessage = { role: 'assistant', content: '', toolCalls: [] }
   messages.value.push(assistantMsg)
 
   sending.value = true
@@ -220,7 +234,7 @@ async function sendMessage() {
         assistantMsg.content = fullContent
         scrollToBottom()
       } else if (event.type === 'tool_call') {
-        handleToolCall(event.data as ToolCallEvent)
+        handleToolCall(event.data as ToolCallEvent, assistantMsg)
       } else if (event.type === 'done') {
         break
       } else if (event.type === 'error') {
@@ -254,7 +268,6 @@ async function sendMessage() {
   } finally {
     sending.value = false
     streaming.value = false
-    toolCalls.value = []
     // 刷新会话列表（更新标题、消息数、排序）
     await loadSessions()
   }
@@ -392,25 +405,6 @@ function formatTime(isoStr: string): string {
 
       <!-- Messages -->
       <div v-else ref="messageList" class="flex-1 overflow-y-auto overflow-x-hidden space-y-4">
-        <!-- Tool call indicators -->
-        <div v-if="toolCalls.length > 0" class="flex justify-start">
-          <div class="flex items-start gap-2 max-w-[80%]">
-            <div class="w-8 h-8 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center text-sm font-medium flex-shrink-0">
-              <el-icon><Tools /></el-icon>
-            </div>
-            <div class="bg-amber-50 border border-amber-100 text-amber-700 rounded-2xl rounded-tl-md px-4 py-2.5 shadow-sm">
-              <div class="space-y-1">
-                <div v-for="tc in toolCalls" :key="tc.name" class="flex items-center gap-2 text-sm">
-                  <span v-if="tc.status === 'start'" class="w-2 h-2 bg-amber-400 rounded-full animate-pulse" />
-                  <span v-else class="w-2 h-2 bg-green-400 rounded-full" />
-                  <span>{{ describeTool(tc.name) }}</span>
-                  <span v-if="tc.status === 'start'" class="text-xs text-amber-400 animate-pulse">进行中...</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- Message bubbles -->
         <div
           v-for="(msg, i) in messages"
@@ -451,8 +445,23 @@ function formatTime(isoStr: string): string {
                 {{ msg.content }}
               </div>
 
-              <!-- Assistant: markdown + streaming cursor -->
+              <!-- Assistant: tool calls + markdown + streaming cursor -->
               <div v-else class="flex flex-wrap items-start gap-0">
+                <!-- Tool calls -->
+                <div v-if="msg.toolCalls && msg.toolCalls.length > 0" class="w-full mb-2 space-y-1">
+                  <div
+                    v-for="tc in msg.toolCalls"
+                    :key="tc.name"
+                    class="flex items-center gap-1.5 text-xs bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5"
+                    :class="tc.status === 'start' ? 'text-amber-700' : 'text-green-700'"
+                  >
+                    <span v-if="tc.status === 'start'" class="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse flex-shrink-0" />
+                    <span v-else class="w-1.5 h-1.5 bg-green-400 rounded-full flex-shrink-0" />
+                    <span>{{ describeTool(tc.name) }}</span>
+                    <span v-if="tc.status === 'start'" class="text-amber-400 animate-pulse ml-auto">进行中...</span>
+                    <span v-else class="text-green-500 ml-auto">✓</span>
+                  </div>
+                </div>
                 <div
                   class="markdown-body text-sm leading-relaxed"
                   v-html="renderMarkdown(msg.content)"

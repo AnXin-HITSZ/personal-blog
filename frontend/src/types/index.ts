@@ -36,6 +36,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   timestamp?: string
+  toolCalls?: ToolCallEvent[]
 }
 
 export interface ChatResponse {

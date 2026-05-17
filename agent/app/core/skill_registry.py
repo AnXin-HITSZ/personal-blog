@@ -142,6 +142,7 @@ class SkillRegistry:
             get_disk_usage, get_process_stats,
             get_git_log, get_git_status, get_git_branch,
             get_git_diff, get_git_commit_detail,
+            publish_article,
         )
 
         self.register(Skill(
@@ -209,6 +210,20 @@ class SkillRegistry:
                 "你可以查看项目的 Git 仓库信息，包括提交历史、分支状态、文件差异等。"
                 "当用户询问代码变更、提交记录、分支信息等问题时，"
                 "应使用 git 相关工具查询 Git 仓库。"
+            ),
+        ))
+
+        self.register(Skill(
+            name="blog",
+            description="博客文章编写与发布",
+            tools=[publish_article],
+            enabled_by_default=True,
+            system_prompt_fragment=(
+                "你具备编写和发布博客文章的能力。当用户要求你撰写博客文章时：\n"
+                "1. 先了解用户想要的主题、风格和内容要求\n"
+                "2. 利用你的知识撰写完整的 Markdown 格式文章\n"
+                "3. 使用 publish_article 工具发布到博客\n"
+                "注意：文章内容应完整、有深度，包含适当的小标题、代码块等 Markdown 元素。"
             ),
         ))
 
