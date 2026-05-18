@@ -8,6 +8,9 @@ from app.agent.deploy_tools.diagnostic_tools import (
     container_env, container_exec, network_connectivity,
     check_disk_and_memory,
 )
+from app.agent.deploy_tools.retrospective_tools import (
+    read_agents_md, write_agents_lesson,
+)
 
 __all__ = [
     "git_pull",
@@ -29,4 +32,6 @@ __all__ = [
     "container_exec",
     "network_connectivity",
     "check_disk_and_memory",
+    "read_agents_md",
+    "write_agents_lesson",
 ]

@@ -1,16 +1,19 @@
 """Agent 驱动 CI/CD 服务 — 编排 Plan-Execute-Replan 部署流水线"""
 
+import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import AsyncGenerator, Dict, Any, Optional
 
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
+from langchain_openai import ChatOpenAI
 from loguru import logger
 
 from app.config import config
 from app.agent.deploy_state import CICDState
 from app.agent.deploy_nodes import cicd_planner, cicd_executor, cicd_replanner
+from app.agent.deploy_tools.retrospective_tools import _default_template
 from app.services.deployment_memory import deployment_memory
 
 # 节点名称常量
@@ -19,6 +22,7 @@ NODE_PLANNER = "planner"
 NODE_EXECUTOR = "executor"
 NODE_REPLANNER = "replanner"
 NODE_FINALIZE = "finalize_deploy"
+NODE_RETROSPECTIVE = "retrospective"
 
 # 阶段名称映射（前端兼容）
 PHASE_NAMES = {
@@ -33,12 +37,14 @@ PHASE_NAMES = {
     "verify": "验证服务",
     "complete": "完成收尾",
     "finalize_deploy": "完成收尾",
+    "retrospective": "经验总结",
 }
 
 
 async def init_deploy(state: CICDState) -> Dict[str, Any]:
-    """前置节点：初始化部署环境"""
+    """前置节点：初始化部署环境，读取历史教训"""
     import subprocess
+    from pathlib import Path
 
     logger.info("=== 初始化部署 ===")
     work_dir = config.deploy_work_dir
@@ -59,12 +65,26 @@ async def init_deploy(state: CICDState) -> Dict[str, Any]:
         )
         commit_msg = msg_result.stdout.strip()
 
+        # 读取 AGENTS.md 历史教训
+        agents_path = Path(work_dir) / "AGENTS.md"
+        lessons_loaded = ""
+        if agents_path.exists():
+            try:
+                lessons_loaded = agents_path.read_text(encoding="utf-8")
+                logger.info(f"已加载 AGENTS.md 历史教训（{len(lessons_loaded)} 字符）")
+            except Exception as e:
+                logger.warning(f"读取 AGENTS.md 失败: {e}")
+                lessons_loaded = ""
+        else:
+            logger.info("AGENTS.md 尚不存在，无历史教训可加载")
+
         phase_status = {
             "init_deploy": "success",
             "planner": "pending",
             "executor": "pending",
             "replanner": "pending",
             "complete": "pending",
+            "retrospective": "pending",
         }
 
         logger.info(f"初始化完成: {current_hash}")
@@ -87,6 +107,8 @@ async def init_deploy(state: CICDState) -> Dict[str, Any]:
             "needs_approval": False,
             "approval_granted": False,
             "pending_diff": "",
+            "lessons_loaded": lessons_loaded,
+            "start_time": datetime.now(timezone.utc).isoformat(),
         }
 
     except Exception as e:
@@ -97,6 +119,7 @@ async def init_deploy(state: CICDState) -> Dict[str, Any]:
             "phase_logs": [("init_deploy", f"初始化失败: {e}", "")],
             "final_status": "failed",
             "error": str(e),
+            "start_time": datetime.now(timezone.utc).isoformat(),
         }
 
 
@@ -128,6 +151,205 @@ async def finalize_deploy(state: CICDState) -> Dict[str, Any]:
         "phase_status": {"complete": final_status},
         "phase_logs": [("complete", f"部署完成，状态: {final_status}", "")],
     }
+
+
+async def cicd_retrospective(state: CICDState) -> Dict[str, Any]:
+    """回顾节点：总结部署经验教训，写入 AGENTS.md
+
+    在 finalize_deploy 之后执行。只对 success/failed 状态做总结。
+    调用 LLM 分析部署数据并生成结构化教训，追加到 AGENTS.md 并 git commit。
+    """
+    import subprocess
+    from pathlib import Path
+
+    logger.info("=== 部署回顾：总结教训 ===")
+
+    final_status = state.get("final_status", "failed")
+    deployment_id = state.get("deployment_id", "unknown")
+
+    # 跳过 cancelled 状态的教训总结
+    if final_status == "cancelled":
+        logger.info("部署已取消，跳过教训总结")
+        return {
+            "current_phase": "retrospective",
+            "phase_status": {"retrospective": "skipped"},
+            "phase_logs": [("retrospective", "部署已取消，跳过教训总结", "")],
+        }
+
+    # 收集部署数据
+    fix_attempts = state.get("fix_attempts", 0)
+    error_log = state.get("error_log", "")
+    phase_logs = state.get("phase_logs", [])
+    past_steps = state.get("past_steps", [])
+    commit_message = state.get("commit_message", "")
+    start_time_str = state.get("start_time", "")
+
+    # 计算部署耗时
+    duration_str = "unknown"
+    if start_time_str:
+        try:
+            start = datetime.fromisoformat(start_time_str)
+            now = datetime.now(timezone.utc)
+            delta = now - start
+            minutes, seconds = divmod(int(delta.total_seconds()), 60)
+            duration_str = f"{minutes}m{seconds}s"
+        except Exception:
+            pass
+
+    # 格式化执行步骤摘要
+    steps_summary = ""
+    if past_steps:
+        lines = []
+        for step, result in past_steps:
+            result_preview = (str(result) or "")[:200].replace("\n", " ")
+            lines.append(f"  - {step}")
+            if result_preview:
+                lines.append(f"    结果: {result_preview}")
+        steps_summary = "\n".join(lines)
+
+    # 格式化日志摘要
+    logs_summary = ""
+    if phase_logs:
+        log_lines = [f"  - {msg}" for _, msg, _ in phase_logs[-10:]]
+        logs_summary = "\n".join(log_lines)
+
+    # 调用 LLM 生成教训总结
+    try:
+        from langchain_core.prompts import ChatPromptTemplate
+        from pydantic import BaseModel, Field
+
+        class DeploymentLesson(BaseModel):
+            problem: str = Field(description="出了什么问题（一句话概括）")
+            root_cause: str = Field(description="根本原因分析")
+            prevention: str = Field(description="下次如何预防（具体可操作的步骤）")
+            impact: str = Field(description="造成的影响（如无则留空）")
+
+        RETRO_PROMPT = """你是一个 CI/CD 部署回顾分析师。分析以下部署数据，生成一条经验教训。
+
+部署数据：
+- 部署 ID: {deployment_id}
+- 最终状态: {final_status}
+- 部署耗时: {duration}
+- 提交信息: {commit_message}
+- 修复尝试次数: {fix_attempts}
+- 错误日志: {error_log}
+- 执行步骤:
+{steps_summary}
+- 部署日志（最近）:
+{logs_summary}
+
+请分析本次部署，生成结构化的教训总结。注意：
+- 如果是 success，重点总结"做对了什么"和"如何保持"
+- 如果是 failed，重点总结"哪里出了问题"和"如何避免"
+- 如果没什么可总结的（一切顺利且无特殊），生成一条简短的正面记录"""
+
+        llm = ChatOpenAI(
+            model=config.llm_model_id,
+            api_key=config.llm_api_key,
+            base_url=config.llm_base_url,
+            temperature=0,
+        )
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", RETRO_PROMPT),
+            ("placeholder", "{messages}"),
+        ])
+
+        chain = prompt | llm.with_structured_output(DeploymentLesson)
+        lesson = await chain.ainvoke({
+            "messages": [],
+            "deployment_id": deployment_id,
+            "final_status": final_status,
+            "duration": duration_str,
+            "commit_message": commit_message,
+            "fix_attempts": str(fix_attempts),
+            "error_log": error_log[:500] if error_log else "（无）",
+            "steps_summary": steps_summary or "（无）",
+            "logs_summary": logs_summary or "（无）",
+        })
+
+        if isinstance(lesson, DeploymentLesson):
+            problem = lesson.problem
+            root_cause = lesson.root_cause
+            prevention = lesson.prevention
+            impact = lesson.impact
+        else:
+            problem = lesson.get("problem", "部署完成")
+            root_cause = lesson.get("root_cause", "常规部署")
+            prevention = lesson.get("prevention", "无特殊注意事项")
+            impact = lesson.get("impact", "")
+
+    except Exception as e:
+        logger.warning(f"LLM 教训总结失败，使用默认内容: {e}")
+        problem = "部署完成"
+        root_cause = "常规部署"
+        prevention = "无特殊注意事项"
+        impact = ""
+
+    # 写入 AGENTS.md
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    entry = (
+        f"\n"
+        f"### {date_str} | {deployment_id} | {final_status}\n"
+        f"- **问题**: {problem}\n"
+        f"- **根因**: {root_cause}\n"
+        f"- **预防**: {prevention}\n"
+    )
+    if impact:
+        entry += f"- **影响**: {impact}\n"
+
+    agents_path = Path(config.deploy_work_dir) / "AGENTS.md"
+    try:
+        if agents_path.exists():
+            content = agents_path.read_text(encoding="utf-8")
+        else:
+            content = _default_template()
+
+        # 在第一个 "---" 分隔符之后追加
+        separator = "---\n"
+        sep_idx = content.find(separator)
+        if sep_idx != -1:
+            insert_pos = sep_idx + len(separator)
+            new_content = content[:insert_pos] + entry + content[insert_pos:]
+        else:
+            new_content = content + "\n" + entry
+
+        agents_path.write_text(new_content, encoding="utf-8")
+        logger.info(f"AGENTS.md 已追加教训: {problem[:60]}")
+
+        # git add + commit（不 push）
+        try:
+            subprocess.run(
+                ["git", "add", "AGENTS.md"],
+                capture_output=True, text=True,
+                cwd=config.deploy_work_dir, timeout=30,
+            )
+            subprocess.run(
+                ["git", "commit", "-m", f"docs: add deployment lesson from {deployment_id}", "--allow-empty"],
+                capture_output=True, text=True,
+                cwd=config.deploy_work_dir, timeout=30,
+            )
+            logger.info(f"AGENTS.md 已提交 git")
+        except Exception as e:
+            logger.warning(f"git commit AGENTS.md 失败: {e}")
+
+        return {
+            "current_phase": "retrospective",
+            "phase_status": {"retrospective": "success"},
+            "phase_logs": [
+                ("retrospective", f"部署回顾完成，状态: {final_status}", ""),
+                ("retrospective", f"教训: {problem[:80]}", ""),
+                ("retrospective", f"预防: {prevention[:80]}", ""),
+            ],
+        }
+
+    except Exception as e:
+        logger.error(f"写入 AGENTS.md 失败: {e}")
+        return {
+            "current_phase": "retrospective",
+            "phase_status": {"retrospective": "failed"},
+            "phase_logs": [("retrospective", f"写入教训失败: {e}", "")],
+        }
 
 
 def should_continue(state: CICDState) -> str:
@@ -180,7 +402,9 @@ class CICDService:
             }
         )
 
-        workflow.add_edge(NODE_FINALIZE, END)
+        workflow.add_node(NODE_RETROSPECTIVE, cicd_retrospective)
+        workflow.add_edge(NODE_FINALIZE, NODE_RETROSPECTIVE)
+        workflow.add_edge(NODE_RETROSPECTIVE, END)
 
         return workflow.compile(checkpointer=self.checkpointer)
 
@@ -223,6 +447,8 @@ class CICDService:
             "needs_approval": False,
             "approval_granted": False,
             "pending_diff": "",
+            "lessons_loaded": "",
+            "start_time": "",
         }
 
         # 保存初始状态到 Redis

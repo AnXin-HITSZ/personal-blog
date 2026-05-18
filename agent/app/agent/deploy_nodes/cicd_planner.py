@@ -77,12 +77,18 @@ async def cicd_planner(state: CICDState) -> Dict[str, Any]:
             temperature=0,
         )
 
+        # 读取历史教训
+        lessons_loaded = state.get("lessons_loaded", "")
+        if not lessons_loaded or lessons_loaded.strip() == "":
+            lessons_loaded = "（尚无历史教训）"
+
         planner_chain = planner_prompt | llm.with_structured_output(CICDPlan)
         plan_result = await planner_chain.ainvoke({
             "messages": [("user", input_text)],
             "tools_description": tools_description,
             "branch": target_branch,
             "max_retries": str(max_retries),
+            "lessons_loaded": lessons_loaded,
         })
 
         # 提取步骤列表

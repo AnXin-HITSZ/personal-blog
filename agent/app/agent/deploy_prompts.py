@@ -14,6 +14,10 @@ CICD_PLANNER_PROMPT = dedent("""
     可用工具列表：
     {tools_description}
 
+    ## 历史教训（来自之前部署的记录）
+    以下是从过去部署中总结的经验教训，请仔细阅读并在规划时避免重蹈覆辙：
+    {lessons_loaded}
+
     部署流程应包含以下结构化步骤：
     1. git_pull — 拉取 {branch} 分支最新代码
     2. npm_build — 构建前端

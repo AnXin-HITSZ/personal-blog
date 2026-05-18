@@ -52,3 +52,7 @@ class CICDState(TypedDict):
     needs_approval: bool                    # 部署前是否需要审批
     approval_granted: bool                  # 审批是否通过
     pending_diff: str                       # 待审批的 git diff
+
+    # ── 反馈回路 ──
+    lessons_loaded: str                     # init_deploy 从 AGENTS.md 读取的历史教训文本
+    start_time: str                         # 部署开始时间（ISO 格式），用于 retrospective 计算耗时
